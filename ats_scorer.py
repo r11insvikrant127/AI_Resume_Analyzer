@@ -1,87 +1,108 @@
 # ============================================================
-# TECHNICAL SKILL MATCH
+# SEMANTIC REQUIREMENT SCORE
 # ============================================================
 
-def calculate_skill_match(
-    matched_technical_skills,
-    missing_technical_skills,
-    partial_technical_skills
+def calculate_requirement_match_percentage(
+    matches
 ):
     """
-    Calculate the Technical Skill Match percentage.
+    Calculate the average semantic match strength.
 
-    IMPORTANT:
-    These lists MUST contain TECHNICAL skills only.
+    Each match must contain:
 
-    Scoring:
-        Full match    = 1.0
-        Partial match = 0.5
-        Missing       = 0.0
+        match_strength
 
-    Formula:
+    where:
 
-        Technical Skill Match =
-            (
-                matched
-                + (partial × 0.5)
-            )
-            / total technical skills
-            × 100
+        1.0 = strong/direct evidence
+        0.0 = no evidence
 
-    Example:
-
-        Matched  = 4
-        Partial  = 2
-        Missing  = 2
-
-        Weighted score = 4 + (2 × 0.5)
-                       = 5
-
-        Total = 4 + 2 + 2
-              = 8
-
-        Technical Skill Match
-            = 5 / 8 × 100
-            = 62.5
-            ≈ 63%
+    The LLM determines the evidence strength.
+    Python performs only the arithmetic.
     """
 
-    matched_count = len(
-        matched_technical_skills
-    )
-
-    partial_count = len(
-        partial_technical_skills
-    )
-
-    missing_count = len(
-        missing_technical_skills
-    )
-
-    total_technical_skills = (
-        matched_count
-        + partial_count
-        + missing_count
-    )
-
-    # Avoid division by zero when the JD contains
-    # no technical skills.
-    if total_technical_skills == 0:
+    if not matches:
         return 0
 
-    weighted_score = (
-        matched_count
-        + (partial_count * 0.5)
-    )
+    strengths = []
 
-    technical_skill_percentage = (
-        weighted_score
-        / total_technical_skills
-        * 100
+    for match in matches:
+
+        if not isinstance(match, dict):
+            continue
+
+        try:
+
+            strength = float(
+                match.get(
+                    "match_strength",
+                    0
+                )
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            strength = 0.0
+
+        # Keep the value mathematically valid.
+
+        strength = max(
+            0.0,
+            min(
+                1.0,
+                strength
+            )
+        )
+
+        strengths.append(
+            strength
+        )
+
+    if not strengths:
+        return 0
+
+    average_strength = (
+        sum(strengths)
+        / len(strengths)
     )
 
     return round(
-        technical_skill_percentage
+        average_strength * 100
+    )
+
+
+# ============================================================
+# TECHNICAL REQUIREMENT SCORE
+# ============================================================
+
+def calculate_skill_match(
+    technical_matches
+):
+    """
+    Calculate the technical skill match percentage.
+
+    Only technical requirements should be passed here.
+
+    Each requirement contains a semantic match_strength
+    between 0 and 1.
+
+    Example:
+
+        Python       -> 1.0
+        REST APIs    -> 0.8
+        Kubernetes   -> 0.0
+
+    Technical Skill Match:
+
+        (1.0 + 0.8 + 0.0) / 3 × 100
+        = 60%
+    """
+
+    return calculate_requirement_match_percentage(
+        technical_matches
     )
 
 
@@ -90,31 +111,27 @@ def calculate_skill_match(
 # ============================================================
 
 def calculate_ats_score(
-    required_keyword_percentage,
+    required_match_percentage,
     technical_skill_percentage,
     good_to_have_percentage
 ):
     """
-    Calculate the final deterministic ATS score.
+    Calculate the final ATS score.
 
     Components:
 
-        Required Keyword Match = 50%
-        Technical Skill Match  = 40%
-        Good-to-Have Match     = 10%
+        Required Requirement Match = 50%
+        Technical Skill Match       = 40%
+        Good-to-Have Match          = 10%
 
-    Formula:
+    Python performs the arithmetic only.
 
-        ATS Score =
-            (Required Keyword Match × 0.50)
-            +
-            (Technical Skill Match × 0.40)
-            +
-            (Good-to-Have Match × 0.10)
+    No skill names, aliases, technology relationships,
+    or domain-specific rules are hardcoded here.
     """
 
     ats_score = (
-        required_keyword_percentage * 0.50
+        required_match_percentage * 0.50
         + technical_skill_percentage * 0.40
         + good_to_have_percentage * 0.10
     )

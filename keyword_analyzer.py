@@ -379,102 +379,507 @@ def split_technical_skills(skills):
 
 
 # ============================================================
-# DETERMINISTIC SKILL CLASSIFICATION
+# SEMANTIC REQUIREMENT MATCHING
 # ============================================================
 
-def _classify(skill, resume_text):
-    """
-    Classify a skill based on explicit resume evidence.
-
-    This version does not invent partial relationships
-    between technologies.
-
-    A semantic partial-match stage can be added separately
-    with evidence from the actual resume.
-    """
-
-    if keyword_exists(
-        skill,
-        resume_text
-    ):
-        return "matched"
-
-    return "missing"
-
-
-def _classify_list(skills, resume_text):
-    """
-    Classify an entire list of skills.
-
-    The partial list is retained for compatibility with
-    the existing app and scorer.
-    """
-
-    matched = []
-    partial = []
-    missing = []
-
-    seen = set()
-
-    for skill in skills:
-
-        name = normalize_skill(
-            get_skill_name(skill)
-        )
-
-        if not name or name in seen:
-            continue
-
-        seen.add(name)
-
-        verdict = _classify(
-            skill,
-            resume_text
-        )
-
-        if verdict == "matched":
-
-            matched.append(name)
-
-        elif verdict == "partial":
-
-            partial.append(name)
-
-        else:
-
-            missing.append(name)
-
-    return matched, partial, missing
-
-
-def match_deterministic_skills(
-    required_skills,
-    good_to_have_skills,
+def compare_requirements_with_resume(
+    client,
+    model,
+    requirements,
     resume_text
 ):
     """
-    Match required and good-to-have skills separately.
+    Compare JD requirements against the actual resume.
 
-    Accepts structured skill objects so that Groq-supplied
-    aliases can be used during deterministic matching.
+    The LLM determines whether the resume contains:
+        matched
+        partial
+        missing
+
+    It also returns a match strength between 0 and 1.
+
+    Python does NOT contain any hardcoded skill relationships.
     """
+
+    if not requirements:
+        return []
+
+    requirement_payload = []
+
+    for requirement in requirements:
+
+        if not isinstance(requirement, dict):
+            continue
+
+        name = normalize_skill(
+            requirement.get("name", "")
+        )
+
+        category = get_skill_category(
+            requirement
+        )
+
+        if not name or category is None:
+            continue
+
+        requirement_payload.append({
+            "name": name,
+            "category": category
+        })
+
+    if not requirement_payload:
+        return []
+
+    prompt = f"""
+You are a resume-to-job-requirement matching system.
+
+Your task is to compare the requirements extracted from a
+job description against the candidate's resume.
+
+The goal is to determine whether the resume provides evidence
+that the candidate satisfies each requirement.
+
+IMPORTANT:
+
+Do NOT rely only on exact keyword matching.
+
+A resume may demonstrate a requirement using:
+- different wording
+- an abbreviation
+- a standard equivalent expression
+- project experience
+- work experience
+- internship experience
+- education
+- certifications
+- explicitly described practical experience
+
+However, do NOT assume that two merely related technologies
+are equivalent.
+
+For example, being familiar with one technology does not
+automatically prove experience with another technology.
+
+Use the actual evidence present in the resume.
+
+------------------------------------------------------------
+MATCH STATUS
+------------------------------------------------------------
+
+For every requirement return exactly one:
+
+"matched"
+
+The resume contains clear and sufficient evidence that the
+candidate has the requirement.
+
+"partial"
+
+The resume contains relevant evidence, but the evidence is
+incomplete, indirect, limited, or does not fully demonstrate
+the requirement.
+
+"missing"
+
+The resume does not provide meaningful evidence for the
+requirement.
+
+------------------------------------------------------------
+MATCH STRENGTH
+------------------------------------------------------------
+
+Return a number from 0.0 to 1.0.
+
+Use:
+
+1.0
+Clear and direct evidence.
+
+0.5
+Meaningful but incomplete or indirect evidence.
+
+0.0
+No meaningful evidence.
+
+You may use values between these when appropriate, but
+do not use arbitrary values merely to inflate the score.
+
+------------------------------------------------------------
+EVIDENCE
+------------------------------------------------------------
+
+For each requirement, identify the relevant evidence from
+the resume.
+
+Do NOT invent evidence.
+
+If no evidence exists, return an empty string.
+
+Keep the evidence concise.
+
+------------------------------------------------------------
+REASON
+------------------------------------------------------------
+
+Briefly explain why the evidence satisfies, partially
+satisfies, or fails to satisfy the requirement.
+
+The explanation must be based only on the resume.
+
+------------------------------------------------------------
+IMPORTANT GENERALIZATION RULE
+------------------------------------------------------------
+
+Do not use a predefined technology relationship list.
+
+Do not assume relationships such as:
+
+technology A -> technology B
+
+unless the actual resume evidence supports the requirement.
+
+Judge each requirement independently from the supplied
+resume.
+
+------------------------------------------------------------
+REQUIREMENTS
+------------------------------------------------------------
+
+{json.dumps(requirement_payload, indent=2)}
+
+------------------------------------------------------------
+RESUME
+------------------------------------------------------------
+
+{resume_text}
+
+------------------------------------------------------------
+OUTPUT
+------------------------------------------------------------
+
+Return ONLY valid JSON.
+
+Use exactly this structure:
+
+{{
+    "matches": [
+        {{
+            "requirement": "requirement name",
+            "category": "technical",
+            "status": "matched",
+            "match_strength": 1.0,
+            "evidence": "Relevant evidence from resume",
+            "reason": "Why this evidence satisfies the requirement"
+        }}
+    ]
+}}
+"""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a resume requirement matching "
+                    "system. Compare requirements against "
+                    "resume evidence objectively. Never "
+                    "invent evidence. Return valid JSON only."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0
+    )
+
+    content = (
+        response
+        .choices[0]
+        .message.content
+        or ""
+    ).strip()
+
+    # ========================================================
+    # REMOVE OPTIONAL MARKDOWN FENCES
+    # ========================================================
+
+    content = re.sub(
+        r"^```(?:json)?\s*",
+        "",
+        content,
+        flags=re.IGNORECASE
+    )
+
+    content = re.sub(
+        r"\s*```$",
+        "",
+        content
+    )
+
+    # ========================================================
+    # PARSE JSON
+    # ========================================================
+
+    try:
+
+        data = json.loads(content)
+
+    except json.JSONDecodeError:
+
+        start = content.find("{")
+        end = content.rfind("}")
+
+        if start == -1 or end == -1:
+
+            raise ValueError(
+                "Groq did not return valid requirement "
+                "matching JSON."
+            )
+
+        try:
+
+            data = json.loads(
+                content[start:end + 1]
+            )
+
+        except json.JSONDecodeError as exc:
+
+            raise ValueError(
+                "Unable to parse Groq's requirement matching."
+            ) from exc
+
+    if not isinstance(data, dict):
+
+        raise ValueError(
+            "Groq returned an invalid requirement matching "
+            "structure."
+        )
+
+    matches = data.get(
+        "matches",
+        []
+    )
+
+    if not isinstance(matches, list):
+        matches = []
+
+    # ========================================================
+    # VALIDATE AND NORMALIZE RESULTS
+    # ========================================================
+
+    valid_statuses = {
+        "matched",
+        "partial",
+        "missing"
+    }
+
+    normalized_matches = []
+
+    seen = set()
+
+    for item in matches:
+
+        if not isinstance(item, dict):
+            continue
+
+        requirement = normalize_skill(
+            item.get(
+                "requirement",
+                ""
+            )
+        )
+
+        category = str(
+            item.get(
+                "category",
+                ""
+            )
+        ).strip().lower()
+
+        status = str(
+            item.get(
+                "status",
+                ""
+            )
+        ).strip().lower()
+
+        evidence = str(
+            item.get(
+                "evidence",
+                ""
+            )
+        ).strip()
+
+        reason = str(
+            item.get(
+                "reason",
+                ""
+            )
+        ).strip()
+
+        if not requirement:
+            continue
+
+        if requirement in seen:
+            continue
+
+        if category not in ALLOWED_CATEGORIES:
+            category = "foundational"
+
+        if status not in valid_statuses:
+            status = "missing"
+
+        try:
+
+            match_strength = float(
+                item.get(
+                    "match_strength",
+                    0
+                )
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            match_strength = 0.0
+
+        # Keep strength inside the valid range.
+
+        match_strength = max(
+            0.0,
+            min(
+                1.0,
+                match_strength
+            )
+        )
+
+        # Keep status and strength logically consistent.
+
+        if status == "matched":
+            match_strength = max(
+                match_strength,
+                0.75
+            )
+
+        elif status == "missing":
+            match_strength = 0.0
+
+        elif status == "partial":
+
+            if match_strength <= 0.0:
+                match_strength = 0.5
+
+            match_strength = min(
+                match_strength,
+                0.74
+            )
+
+        normalized_matches.append({
+            "requirement": requirement,
+            "category": category,
+            "status": status,
+            "match_strength": round(
+                match_strength,
+                3
+            ),
+            "evidence": evidence,
+            "reason": reason
+        })
+
+        seen.add(requirement)
+
+    # ========================================================
+    # ENSURE EVERY REQUIREMENT HAS A RESULT
+    # ========================================================
+
+    returned_requirements = {
+        item["requirement"]
+        for item in normalized_matches
+    }
+
+    for requirement in requirement_payload:
+
+        name = requirement["name"]
+
+        if name in returned_requirements:
+            continue
+
+        normalized_matches.append({
+            "requirement": name,
+            "category": requirement["category"],
+            "status": "missing",
+            "match_strength": 0.0,
+            "evidence": "",
+            "reason": (
+                "No matching evidence was returned from "
+                "the resume."
+            )
+        })
+
+    return normalized_matches
+
+
+# ============================================================
+# ORGANIZE SEMANTIC MATCH RESULTS
+# ============================================================
+
+def organize_match_results(
+    required_matches,
+    good_to_have_matches
+):
+    """
+    Organize semantic requirement matches into the structure
+    expected by the rest of the application.
+    """
+
+    def classify(matches):
+
+        matched = []
+        partial = []
+        missing = []
+
+        for item in matches:
+
+            name = item["requirement"]
+            status = item["status"]
+
+            if status == "matched":
+
+                matched.append(name)
+
+            elif status == "partial":
+
+                partial.append(name)
+
+            else:
+
+                missing.append(name)
+
+        return (
+            matched,
+            partial,
+            missing
+        )
 
     (
         matched_required,
         partial_required,
         missing_required
-    ) = _classify_list(
-        required_skills,
-        resume_text
+    ) = classify(
+        required_matches
     )
 
     (
         matched_good_to_have,
         partial_good_to_have,
         missing_good_to_have
-    ) = _classify_list(
-        good_to_have_skills,
-        resume_text
+    ) = classify(
+        good_to_have_matches
     )
 
     return {
@@ -497,8 +902,6 @@ def match_deterministic_skills(
         "missing_good_to_have":
             missing_good_to_have,
 
-        # Existing app compatibility
-
         "matched_skills":
             matched_required
             + matched_good_to_have,
@@ -512,7 +915,7 @@ def match_deterministic_skills(
             + missing_good_to_have
     }
 
-
+    
 # ============================================================
 # KEYWORD MATCH PERCENTAGES
 # ============================================================

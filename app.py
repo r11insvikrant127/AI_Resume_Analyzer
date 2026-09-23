@@ -4,16 +4,22 @@ import re
 
 import streamlit as st
 from dotenv import load_dotenv
-from pypdf import PdfReader
 from groq import Groq
+
+from resume_parser import (
+    extract_resume_text,
+    clean_resume_text
+)
 
 from keyword_analyzer import (
     extract_keywords_from_jd,
     calculate_keyword_match,
-    match_deterministic_skills
+    compare_requirements_with_resume,
+    organize_match_results
 )
 
 from ats_scorer import (
+    calculate_requirement_match_percentage,
     calculate_skill_match,
     calculate_ats_score
 )
@@ -106,53 +112,6 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True
 )
-
-
-# ============================================================
-# PDF TEXT EXTRACTION
-# ============================================================
-
-def extract_resume_text(uploaded_file):
-    """
-    Extract text from all pages of the uploaded PDF.
-    """
-
-    try:
-
-        reader = PdfReader(
-            uploaded_file
-        )
-
-        pages = []
-
-        for page in reader.pages:
-
-            text = page.extract_text()
-
-            if text:
-                pages.append(text)
-
-        return "\n".join(pages)
-
-    except Exception as e:
-
-        raise Exception(
-            f"Unable to read PDF: {e}"
-        )
-
-
-def clean_text(text):
-    """
-    Normalize whitespace in extracted resume text.
-    """
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    return text.strip()
 
 
 # ============================================================
@@ -595,7 +554,7 @@ if analyze_button:
                 uploaded_file
             )
 
-            resume_text = clean_text(
+            resume_text = clean_resume_text(
                 resume_text
             )
 
@@ -670,27 +629,53 @@ if analyze_button:
 
 
             # =================================================
-            # 5. KEYWORD MATCHING
+            # 6. SEMANTIC REQUIREMENT MATCHING
+            # =================================================
+            #
+            # Compare every JD requirement against actual
+            # resume evidence.
+            #
+            # No hardcoded skill relationships are used.
             # =================================================
 
-            keyword_analysis = calculate_keyword_match(
-                required_skills,
-                good_to_have_skills,
-                resume_text
-            )
-
-
-            # =================================================
-            # 6. DETERMINISTIC SKILL CLASSIFICATION
-            # =================================================
-
-            det = match_deterministic_skills(
-                required_skills=required_skills,
-                good_to_have_skills=good_to_have_skills,
+            required_matches = compare_requirements_with_resume(
+                client=client,
+                model=MODEL,
+                requirements=required_skills,
                 resume_text=resume_text
             )
 
+            good_to_have_matches = compare_requirements_with_resume(
+                client=client,
+                model=MODEL,
+                requirements=good_to_have_skills,
+                resume_text=resume_text
+            )
 
+            det = organize_match_results(
+                required_matches=required_matches,
+                good_to_have_matches=good_to_have_matches
+            )
+
+            # =================================================
+            # 7. SEMANTIC REQUIREMENT SCORES
+            # =================================================
+            #
+            # These percentages are based on semantic evidence
+            # rather than exact keyword presence.
+            # =================================================
+
+            required_match_percentage = (
+                calculate_requirement_match_percentage(
+                    required_matches
+                )
+            )
+
+            good_to_have_match_percentage = (
+                calculate_requirement_match_percentage(
+                    good_to_have_matches
+                )
+            )
             # =================================================
             # 7. BUILD CATEGORY LOOKUP
             # =================================================
@@ -787,34 +772,54 @@ if analyze_button:
 
 
             # =================================================
-            # 11. TECHNICAL MATCHED / PARTIAL / MISSING
+            # 11. TECHNICAL REQUIREMENT MATCHES
+            # =================================================
+            #
+            # Keep the complete semantic match objects so that
+            # match_strength is preserved.
             # =================================================
 
-            technical_matched = subset(
-                det["matched_required"],
-                required_technical
-            )
-
-            technical_partial = subset(
-                det["partial_required"],
-                required_technical
-            )
-
-            technical_missing = subset(
-                det["missing_required"],
-                required_technical
-            )
+            technical_matches = [
+                match
+                for match in required_matches
+                if match.get("category") == "technical"
+            ]
 
 
             # =================================================
             # 12. TECHNICAL SKILL MATCH
             # =================================================
+            #
+            # The scorer uses the semantic match_strength returned
+            # by the requirement matcher.
+            # =================================================
 
             technical_skill_percentage = calculate_skill_match(
-                technical_matched,
-                technical_missing,
-                technical_partial
+                technical_matches
             )
+
+
+            # =================================================
+            # 13. TECHNICAL MATCHED / PARTIAL / MISSING
+            # =================================================
+
+            technical_matched = [
+                match["requirement"]
+                for match in technical_matches
+                if match.get("status") == "matched"
+            ]
+
+            technical_partial = [
+                match["requirement"]
+                for match in technical_matches
+                if match.get("status") == "partial"
+            ]
+
+            technical_missing = [
+                match["requirement"]
+                for match in technical_matches
+                if match.get("status") == "missing"
+            ]
 
 
             # =================================================
@@ -844,17 +849,13 @@ if analyze_button:
 
 
             # =================================================
-            # 14. FINAL ATS SCORE
+            # FINAL ATS SCORE
             # =================================================
 
             ats_score = calculate_ats_score(
-                keyword_analysis[
-                    "required_percentage"
-                ],
+                required_match_percentage,
                 technical_skill_percentage,
-                keyword_analysis[
-                    "good_to_have_percentage"
-                ]
+                good_to_have_match_percentage
             )
             st.write("========== DEBUG SCORE ==========")
 
@@ -978,21 +979,20 @@ if analyze_button:
             )
 
             result["required_keyword_percentage"] = (
-                keyword_analysis[
-                    "required_percentage"
-                ]
+                required_match_percentage
             )
 
             result["good_to_have_percentage"] = (
-                keyword_analysis[
-                    "good_to_have_percentage"
-                ]
+                good_to_have_match_percentage
             )
 
             result["keyword_match_percentage"] = (
-                keyword_analysis[
-                    "overall_percentage"
-                ]
+                round(
+                    (
+                        required_match_percentage
+                        + good_to_have_match_percentage
+                    ) / 2
+                )
             )
 
 
