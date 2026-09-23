@@ -10,8 +10,7 @@ from groq import Groq
 from keyword_analyzer import (
     extract_keywords_from_jd,
     calculate_keyword_match,
-    match_deterministic_skills,
-    split_technical_skills          # NEW
+    match_deterministic_skills
 )
 
 from ats_scorer import (
@@ -39,7 +38,9 @@ if not API_KEY:
     )
     st.stop()
 
-client = Groq(api_key=API_KEY)
+client = Groq(
+    api_key=API_KEY
+)
 
 MODEL = "openai/gpt-oss-120b"
 
@@ -67,11 +68,13 @@ st.markdown(
         font-weight: 700;
         margin-bottom: 5px;
     }
+
     .subtitle {
         font-size: 18px;
         color: #666;
         margin-bottom: 25px;
     }
+
     .formula {
         font-family: monospace;
         background: #f6f6f6;
@@ -106,31 +109,75 @@ st.markdown(
 
 
 # ============================================================
-# FUNCTIONS
+# PDF TEXT EXTRACTION
 # ============================================================
 
 def extract_resume_text(uploaded_file):
+    """
+    Extract text from all pages of the uploaded PDF.
+    """
+
     try:
-        reader = PdfReader(uploaded_file)
+
+        reader = PdfReader(
+            uploaded_file
+        )
+
         pages = []
+
         for page in reader.pages:
+
             text = page.extract_text()
+
             if text:
                 pages.append(text)
+
         return "\n".join(pages)
+
     except Exception as e:
-        raise Exception(f"Unable to read PDF: {e}")
+
+        raise Exception(
+            f"Unable to read PDF: {e}"
+        )
 
 
 def clean_text(text):
-    text = re.sub(r"\s+", " ", text)
+    """
+    Normalize whitespace in extracted resume text.
+    """
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
     return text.strip()
 
 
-def analyze_resume(resume_text, job_description):
+# ============================================================
+# LLM QUALITATIVE ANALYSIS
+# ============================================================
+
+def analyze_resume(
+    resume_text,
+    job_description
+):
     """
-    LLM is used ONLY for qualitative narrative.
-    No scoring, no skill classification.
+    Use the LLM for qualitative resume analysis.
+
+    Numerical ATS scoring is NOT performed here.
+
+    The LLM provides:
+
+        - candidate summary
+        - strengths
+        - weaknesses
+        - experience analysis
+        - education analysis
+        - project analysis
+        - resume improvements
+        - interview questions
     """
 
     prompt = f"""
@@ -156,15 +203,30 @@ Return exactly this structure:
 Rules:
 
 1. Do not invent candidate experience.
-2. Base the analysis only on the provided resume and job description.
-3. interview_questions should contain 10 relevant questions.
-4. Keep the answer concise but useful.
-5. Return JSON only.
+
+2. Do not assume a skill that is not supported by
+   the resume.
+
+3. Base the analysis only on the provided resume
+   and job description.
+
+4. interview_questions should contain 10 relevant
+   questions.
+
+5. Keep the answer concise but useful.
+
+6. Do not calculate or invent an ATS score.
+
+7. Do not fabricate achievements or metrics.
+
+8. Return JSON only.
 
 RESUME:
+
 {resume_text}
 
 JOB DESCRIPTION:
+
 {job_description}
 """
 
@@ -186,35 +248,96 @@ JOB DESCRIPTION:
         temperature=0.2
     )
 
-    content = response.choices[0].message.content
-    return parse_json_response(content)
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+        or ""
+    )
 
+    return parse_json_response(
+        content
+    )
+
+
+# ============================================================
+# JSON PARSER
+# ============================================================
 
 def parse_json_response(content):
+    """
+    Parse JSON returned by the LLM.
+
+    Also handles responses accidentally wrapped
+    in Markdown code fences.
+    """
+
     content = content.strip()
-    content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
-    content = re.sub(r"^```\s*", "", content)
-    content = re.sub(r"\s*```$", "", content)
+
+    content = re.sub(
+        r"^```json\s*",
+        "",
+        content,
+        flags=re.IGNORECASE
+    )
+
+    content = re.sub(
+        r"^```\s*",
+        "",
+        content
+    )
+
+    content = re.sub(
+        r"\s*```$",
+        "",
+        content
+    )
 
     try:
-        return json.loads(content)
+
+        return json.loads(
+            content
+        )
+
     except json.JSONDecodeError:
+
         start = content.find("{")
         end = content.rfind("}")
+
         if start != -1 and end != -1:
-            return json.loads(content[start:end + 1])
+
+            return json.loads(
+                content[
+                    start:end + 1
+                ]
+            )
+
         raise ValueError(
-            "The AI returned an invalid response. Please try again."
+            "The AI returned an invalid response. "
+            "Please try again."
         )
 
 
+# ============================================================
+# GENERAL RESUME TIPS
+# ============================================================
+
 def generate_resume_tips(resume_text):
+    """
+    Generate general resume-improvement suggestions.
+
+    The model is explicitly instructed not to invent
+    achievements or numerical metrics.
+    """
+
     prompt = f"""
 Review this resume as a professional technical recruiter.
 
 Provide 8 practical recommendations to improve it.
 
 Focus on:
+
 - ATS compatibility
 - Technical skills
 - Project descriptions
@@ -223,6 +346,24 @@ Focus on:
 - Formatting
 - Quantifiable results
 - Professional summary
+
+IMPORTANT:
+
+1. Do NOT invent achievements.
+
+2. Do NOT fabricate numbers.
+
+3. Do NOT estimate metrics.
+
+4. Do NOT suggest adding fake percentages,
+   fake user counts, fake performance improvements,
+   fake revenue, fake rankings, or fake impact.
+
+5. If the resume does not contain measurable results,
+   recommend adding real metrics only when the candidate
+   can verify them.
+
+6. Recommendations must be based on the actual resume.
 
 Resume:
 
@@ -236,7 +377,11 @@ Return only a numbered list.
         messages=[
             {
                 "role": "system",
-                "content": "You are an expert resume coach."
+                "content": (
+                    "You are an expert resume coach. "
+                    "Never invent or fabricate candidate "
+                    "achievements or metrics."
+                )
             },
             {
                 "role": "user",
@@ -246,31 +391,54 @@ Return only a numbered list.
         temperature=0.3
     )
 
-    return response.choices[0].message.content
+    return (
+        response
+        .choices[0]
+        .message
+        .content
+    )
 
 
 # ============================================================
-# CACHED JD KEYWORD EXTRACTION   # NEW
+# CACHED JD SKILL EXTRACTION
 # ============================================================
 
 def get_jd_keywords(job_description):
     """
-    Cache JD keyword extraction per unique JD within the
-    Streamlit session. Avoids re-calling Groq on repeated
-    "Analyze Resume" presses for the same JD.
+    Cache JD skill extraction for the current Streamlit
+    session.
+
+    The returned structure contains:
+
+        required_skills
+        good_to_have_skills
+
+    Each skill contains:
+
+        name
+        category
+        aliases
     """
 
-    cache = st.session_state.setdefault("jd_keyword_cache", {})
+    cache = st.session_state.setdefault(
+        "jd_keyword_cache",
+        {}
+    )
+
     key = job_description.strip()
 
     if key in cache:
+
         return cache[key]
 
     keyword_data = extract_keywords_from_jd(
-        client, MODEL, job_description
+        client,
+        MODEL,
+        job_description
     )
 
     cache[key] = keyword_data
+
     return keyword_data
 
 
@@ -280,19 +448,26 @@ def get_jd_keywords(job_description):
 
 with st.sidebar:
 
-    st.header("Project Information")
+    st.header(
+        "Project Information"
+    )
 
     st.write(
         """
-        This application uses Generative AI for qualitative
-        analysis and deterministic Python for ATS scoring
-        and skill matching.
+        This application uses Generative AI for semantic
+        job-description analysis and qualitative resume
+        analysis.
+
+        Python performs deterministic resume matching
+        and ATS score calculation.
         """
     )
 
     st.divider()
 
-    st.subheader("Technology")
+    st.subheader(
+        "Technology"
+    )
 
     st.write(
         """
@@ -312,7 +487,9 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader("Analysis")
+    st.subheader(
+        "Analysis"
+    )
 
     st.write(
         """
@@ -340,14 +517,23 @@ with st.sidebar:
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("1. Upload Resume")
+
+    st.subheader(
+        "1. Upload Resume"
+    )
+
     uploaded_file = st.file_uploader(
         "Upload Resume PDF",
         type=["pdf"]
     )
 
+
 with col2:
-    st.subheader("2. Job Description")
+
+    st.subheader(
+        "2. Job Description"
+    )
+
     job_description = st.text_area(
         "Paste the job description here",
         height=250,
@@ -374,184 +560,535 @@ analyze_button = st.button(
 
 if analyze_button:
 
+    # --------------------------------------------------------
+    # Validate inputs
+    # --------------------------------------------------------
+
     if uploaded_file is None:
-        st.warning("Please upload a resume PDF.")
+
+        st.warning(
+            "Please upload a resume PDF."
+        )
+
         st.stop()
 
     if not job_description.strip():
-        st.warning("Please enter a job description.")
+
+        st.warning(
+            "Please enter a job description."
+        )
+
         st.stop()
 
-    with st.spinner("Reading and analyzing resume..."):
+
+    with st.spinner(
+        "Reading and analyzing resume..."
+    ):
 
         try:
-            # --------------------------------------------------
-            # Resume text
-            # --------------------------------------------------
 
-            resume_text = extract_resume_text(uploaded_file)
-            resume_text = clean_text(resume_text)
+            # =================================================
+            # 1. EXTRACT RESUME TEXT
+            # =================================================
 
-            if len(resume_text) < 100:
-                st.error(
-                    "Very little text was extracted from the PDF. "
-                    "Please upload a text-based PDF."
-                )
-                st.stop()
-
-            # --------------------------------------------------
-            # LLM narrative
-            # --------------------------------------------------
-
-            result = analyze_resume(resume_text, job_description)
-
-            # --------------------------------------------------
-            # JD keywords (cached)
-            # --------------------------------------------------
-
-            keyword_data = get_jd_keywords(job_description)
-
-            required_keywords = keyword_data.get(
-                "required_keywords", []
-            )
-            good_to_have_keywords = keyword_data.get(
-                "good_to_have_keywords", []
+            resume_text = extract_resume_text(
+                uploaded_file
             )
 
-            # --------------------------------------------------
-            # Required keyword match (all required keywords)
-            # --------------------------------------------------
-
-            keyword_analysis = calculate_keyword_match(
-                required_keywords,
-                good_to_have_keywords,
+            resume_text = clean_text(
                 resume_text
             )
 
-            # --------------------------------------------------
-            # Deterministic skill classification
-            # --------------------------------------------------
+            if len(resume_text) < 100:
+
+                st.error(
+                    "Very little text was extracted from "
+                    "the PDF. Please upload a text-based PDF."
+                )
+
+                st.stop()
+
+
+            # =================================================
+            # 2. LLM QUALITATIVE ANALYSIS
+            # =================================================
+
+            result = analyze_resume(
+                resume_text,
+                job_description
+            )
+
+
+            # =================================================
+            # 3. EXTRACT STRUCTURED JD SKILLS
+            # =================================================
+
+            keyword_data = get_jd_keywords(
+                job_description
+            )
+
+            required_skills = keyword_data.get(
+                "required_skills",
+                []
+            )
+
+            good_to_have_skills = keyword_data.get(
+                "good_to_have_skills",
+                []
+            )
+
+
+            # =================================================
+            # 4. LEGACY DISPLAY KEYWORDS
+            # =================================================
+            #
+            # The keyword analyzer still provides these
+            # normalized names for display compatibility.
+            # =================================================
+
+            required_keywords = keyword_data.get(
+                "required_keywords",
+                [
+                    skill.get(
+                        "name",
+                        ""
+                    )
+                    for skill in required_skills
+                ]
+            )
+
+            good_to_have_keywords = keyword_data.get(
+                "good_to_have_keywords",
+                [
+                    skill.get(
+                        "name",
+                        ""
+                    )
+                    for skill in good_to_have_skills
+                ]
+            )
+
+
+            # =================================================
+            # 5. KEYWORD MATCHING
+            # =================================================
+
+            keyword_analysis = calculate_keyword_match(
+                required_skills,
+                good_to_have_skills,
+                resume_text
+            )
+
+
+            # =================================================
+            # 6. DETERMINISTIC SKILL CLASSIFICATION
+            # =================================================
 
             det = match_deterministic_skills(
-                required_skills=required_keywords,
-                good_to_have_skills=good_to_have_keywords,
+                required_skills=required_skills,
+                good_to_have_skills=good_to_have_skills,
                 resume_text=resume_text
             )
 
-            # --------------------------------------------------
-            # Split required skills into technical vs non-technical
-            # -> used for the Technical Skill Match component
-            # --------------------------------------------------
 
-            required_technical, required_non_technical = (
-                split_technical_skills(
+            # =================================================
+            # 7. BUILD CATEGORY LOOKUP
+            # =================================================
+            #
+            # Groq has already determined whether each skill
+            # is technical, soft-skill, or foundational.
+            #
+            # Python does NOT maintain a hardcoded skill list.
+            # =================================================
+
+            required_category_map = {}
+
+            for skill in required_skills:
+
+                name = str(
+                    skill.get(
+                        "name",
+                        ""
+                    )
+                ).strip().lower()
+
+                category = str(
+                    skill.get(
+                        "category",
+                        ""
+                    )
+                ).strip().lower()
+
+                if name:
+
+                    required_category_map[
+                        name
+                    ] = category
+
+
+            # =================================================
+            # 8. SEPARATE REQUIRED TECHNICAL SKILLS
+            # =================================================
+
+            required_technical = [
+                skill_name
+                for skill_name in (
                     det["matched_required"]
                     + det["partial_required"]
                     + det["missing_required"]
                 )
+                if required_category_map.get(
+                    skill_name,
+                    ""
+                ) == "technical"
+            ]
+
+
+            # =================================================
+            # 9. REQUIRED NON-TECHNICAL SKILLS
+            # =================================================
+
+            required_non_technical = [
+                skill_name
+                for skill_name in (
+                    det["matched_required"]
+                    + det["partial_required"]
+                    + det["missing_required"]
+                )
+                if required_category_map.get(
+                    skill_name,
+                    ""
+                ) != "technical"
+            ]
+
+
+            # =================================================
+            # 10. HELPER FOR TECHNICAL SUBSETS
+            # =================================================
+
+            def subset(
+                skills,
+                allowed_skills
+            ):
+                """
+                Keep only skills classified as technical
+                by Groq.
+                """
+
+                allowed = set(
+                    allowed_skills
+                )
+
+                return [
+                    skill
+                    for skill in skills
+                    if skill in allowed
+                ]
+
+
+            # =================================================
+            # 11. TECHNICAL MATCHED / PARTIAL / MISSING
+            # =================================================
+
+            technical_matched = subset(
+                det["matched_required"],
+                required_technical
             )
 
-            def subset(skills, pool):
-                return [s for s in skills if s in pool]
-
-            tech_matched = subset(
-                det["matched_required"], required_technical
-            )
-            tech_partial = subset(
-                det["partial_required"], required_technical
-            )
-            tech_missing = subset(
-                det["missing_required"], required_technical
+            technical_partial = subset(
+                det["partial_required"],
+                required_technical
             )
 
-            # --------------------------------------------------
-            # Technical Skill Match %
-            # --------------------------------------------------
+            technical_missing = subset(
+                det["missing_required"],
+                required_technical
+            )
+
+
+            # =================================================
+            # 12. TECHNICAL SKILL MATCH
+            # =================================================
 
             technical_skill_percentage = calculate_skill_match(
-                tech_matched,
-                tech_missing,
-                tech_partial
+                technical_matched,
+                technical_missing,
+                technical_partial
             )
 
-            # --------------------------------------------------
-            # Skill-gap analysis (deterministic)
-            # --------------------------------------------------
+
+            # =================================================
+            # 13. SKILL GAP ANALYSIS
+            # =================================================
 
             skill_gap = build_skill_gap_analysis(
-                matched_required=det["matched_required"],
-                partial_required=det["partial_required"],
-                missing_required=det["missing_required"],
-                matched_good_to_have=det["matched_good_to_have"],
-                partial_good_to_have=det["partial_good_to_have"],
-                missing_good_to_have=det["missing_good_to_have"]
+                matched_required=det[
+                    "matched_required"
+                ],
+                partial_required=det[
+                    "partial_required"
+                ],
+                missing_required=det[
+                    "missing_required"
+                ],
+                matched_good_to_have=det[
+                    "matched_good_to_have"
+                ],
+                partial_good_to_have=det[
+                    "partial_good_to_have"
+                ],
+                missing_good_to_have=det[
+                    "missing_good_to_have"
+                ]
             )
 
-            # --------------------------------------------------
-            # Final ATS score
-            # --------------------------------------------------
+
+            # =================================================
+            # 14. FINAL ATS SCORE
+            # =================================================
 
             ats_score = calculate_ats_score(
-                keyword_analysis["required_percentage"],
+                keyword_analysis[
+                    "required_percentage"
+                ],
                 technical_skill_percentage,
+                keyword_analysis[
+                    "good_to_have_percentage"
+                ]
+            )
+            st.write("========== DEBUG SCORE ==========")
+
+            st.write(
+                "Required Keyword Match:",
+                keyword_analysis["required_percentage"]
+            )
+
+            st.write(
+                "Technical Skill Match:",
+                technical_skill_percentage
+            )
+
+            st.write(
+                "Good-to-Have Match:",
                 keyword_analysis["good_to_have_percentage"]
             )
 
-            # --------------------------------------------------
-            # Store results
-            # --------------------------------------------------
+            st.write(
+                "Matched Required:",
+                det["matched_required"]
+            )
 
-            result["required_keywords"] = required_keywords
-            result["good_to_have_keywords"] = good_to_have_keywords
+            st.write(
+                "Partial Required:",
+                det["partial_required"]
+            )
+
+            st.write(
+                "Missing Required:",
+                det["missing_required"]
+            )
+
+            st.write(
+                "Matched Good-to-Have:",
+                det["matched_good_to_have"]
+            )
+
+            st.write(
+                "Partial Good-to-Have:",
+                det["partial_good_to_have"]
+            )
+
+            st.write(
+                "Missing Good-to-Have:",
+                det["missing_good_to_have"]
+            )
+
+            st.write(
+                "Technical Matched:",
+                technical_matched
+            )
+
+            st.write(
+                "Technical Partial:",
+                technical_partial
+            )
+
+            st.write(
+                "Technical Missing:",
+                technical_missing
+            )
+
+            st.write(
+                "FINAL ATS:",
+                ats_score
+            )
+
+            st.write(
+                "================================"
+            )
+
+
+            # =================================================
+            # 15. STORE JD DATA
+            # =================================================
+
+            result["required_skills"] = (
+                required_skills
+            )
+
+            result["good_to_have_skills"] = (
+                good_to_have_skills
+            )
+
+            result["required_keywords"] = (
+                required_keywords
+            )
+
+            result["good_to_have_keywords"] = (
+                good_to_have_keywords
+            )
+
+
+            # =================================================
+            # 16. STORE KEYWORD MATCH RESULTS
+            # =================================================
 
             result["matched_required_keywords"] = (
-                keyword_analysis["matched_required"]
+                keyword_analysis[
+                    "matched_required"
+                ]
             )
+
             result["missing_required_keywords"] = (
-                keyword_analysis["missing_required"]
+                keyword_analysis[
+                    "missing_required"
+                ]
             )
+
             result["matched_good_to_have_keywords"] = (
-                keyword_analysis["matched_good_to_have"]
+                keyword_analysis[
+                    "matched_good_to_have"
+                ]
             )
+
             result["missing_good_to_have_keywords"] = (
-                keyword_analysis["missing_good_to_have"]
+                keyword_analysis[
+                    "missing_good_to_have"
+                ]
             )
 
             result["required_keyword_percentage"] = (
-                keyword_analysis["required_percentage"]
-            )
-            result["good_to_have_percentage"] = (
-                keyword_analysis["good_to_have_percentage"]
-            )
-            result["keyword_match_percentage"] = (
-                keyword_analysis["overall_percentage"]
+                keyword_analysis[
+                    "required_percentage"
+                ]
             )
 
-            # Technical-only skill lists (used by UI + scoring)
-            result["technical_matched_skills"] = tech_matched
-            result["technical_partial_skills"] = tech_partial
-            result["technical_missing_skills"] = tech_missing
+            result["good_to_have_percentage"] = (
+                keyword_analysis[
+                    "good_to_have_percentage"
+                ]
+            )
+
+            result["keyword_match_percentage"] = (
+                keyword_analysis[
+                    "overall_percentage"
+                ]
+            )
+
+
+            # =================================================
+            # 17. STORE TECHNICAL SKILL DATA
+            # =================================================
+
+            result["technical_matched_skills"] = (
+                technical_matched
+            )
+
+            result["technical_partial_skills"] = (
+                technical_partial
+            )
+
+            result["technical_missing_skills"] = (
+                technical_missing
+            )
+
             result["technical_skill_percentage"] = (
                 technical_skill_percentage
             )
 
-            # Full required skill lists (for display)
-            result["matched_skills"] = det["matched_required"]
-            result["partial_match_skills"] = det["partial_required"]
-            result["missing_skills"] = det["missing_required"]
 
-            result["skill_match_percentage"] = technical_skill_percentage
-            result["ats_score"] = ats_score
-            result["skill_gap"] = skill_gap
+            # =================================================
+            # 18. STORE ALL REQUIRED SKILL DATA
+            # =================================================
+
+            result["matched_skills"] = (
+                det["matched_required"]
+            )
+
+            result["partial_match_skills"] = (
+                det["partial_required"]
+            )
+
+            result["missing_skills"] = (
+                det["missing_required"]
+            )
+
+
+            # =================================================
+            # 19. STORE CATEGORY DATA
+            # =================================================
+
+            result["required_technical_skills"] = (
+                required_technical
+            )
+
+            result["required_non_technical_skills"] = (
+                required_non_technical
+            )
+
+
+            # =================================================
+            # 20. STORE FINAL RESULTS
+            # =================================================
+
+            result["skill_match_percentage"] = (
+                technical_skill_percentage
+            )
+
+            result["ats_score"] = (
+                ats_score
+            )
+
+            result["skill_gap"] = (
+                skill_gap
+            )
+
+
+            # =================================================
+            # 21. SAVE TO STREAMLIT SESSION
+            # =================================================
 
             st.session_state["analysis"] = result
-            st.session_state["resume_text"] = resume_text
-            st.session_state["job_description"] = job_description
 
-            st.success("Resume analysis completed successfully!")
+            st.session_state["resume_text"] = (
+                resume_text
+            )
+
+            st.session_state["job_description"] = (
+                job_description
+            )
+
+
+            st.success(
+                "Resume analysis completed successfully!"
+            )
+
 
         except Exception as e:
-            st.error(f"Analysis failed: {e}")
+
+            st.error(
+                f"Analysis failed: {e}"
+            )
 
 
 # ============================================================
@@ -560,295 +1097,862 @@ if analyze_button:
 
 if "analysis" in st.session_state:
 
-    result = st.session_state["analysis"]
+    result = st.session_state[
+        "analysis"
+    ]
 
     st.divider()
-    st.header("Resume Analysis Report")
 
-    # --------------------------------------------------------
-    # Headline metrics
-    # --------------------------------------------------------
+    st.header(
+        "Resume Analysis Report"
+    )
 
-    score = result.get("ats_score", 0)
-    required_score = result.get("required_keyword_percentage", 0)
-    tech_score = result.get("technical_skill_percentage", 0)
-    good_to_have_score = result.get("good_to_have_percentage", 0)
+
+    # ========================================================
+    # HEADLINE METRICS
+    # ========================================================
+
+    score = result.get(
+        "ats_score",
+        0
+    )
+
+    required_score = result.get(
+        "required_keyword_percentage",
+        0
+    )
+
+    technical_score = result.get(
+        "technical_skill_percentage",
+        0
+    )
+
+    good_to_have_score = result.get(
+        "good_to_have_percentage",
+        0
+    )
+
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        st.metric("ATS Score", f"{score}%")
+
+        st.metric(
+            "ATS Score",
+            f"{score}%"
+        )
 
     with c2:
+
         st.metric(
             "Required Keyword Match",
             f"{required_score}%"
         )
 
     with c3:
+
         st.metric(
             "Technical Skill Match",
-            f"{tech_score}%"
+            f"{technical_score}%"
         )
 
-    st.progress(min(max(score, 0), 100) / 100)
 
-    # --------------------------------------------------------
-    # Explicit score calculation  # NEW
-    # --------------------------------------------------------
+    st.progress(
+        min(
+            max(score, 0),
+            100
+        ) / 100
+    )
 
-    st.subheader("How This ATS Score Was Calculated")
 
-    req_contrib = round(required_score * 0.50, 2)
-    tech_contrib = round(tech_score * 0.40, 2)
-    good_contrib = round(good_to_have_score * 0.10, 2)
+    # ========================================================
+    # SCORE CALCULATION
+    # ========================================================
+
+    st.subheader(
+        "How This ATS Score Was Calculated"
+    )
+
+    req_contribution = round(
+        required_score * 0.50,
+        2
+    )
+
+    technical_contribution = round(
+        technical_score * 0.40,
+        2
+    )
+
+    good_to_have_contribution = round(
+        good_to_have_score * 0.10,
+        2
+    )
 
     st.markdown(
         f"""
 <div class="formula">
-Required Keyword Match : {required_score}% × 0.50 = {req_contrib}<br>
-Technical Skill Match  : {tech_score}% × 0.40 = {tech_contrib}<br>
-Good-to-Have Match     : {good_to_have_score}% × 0.10 = {good_contrib}<br>
+
+Required Keyword Match :
+{required_score}% × 0.50 = {req_contribution}
+
+<br>
+
+Technical Skill Match :
+{technical_score}% × 0.40 = {technical_contribution}
+
+<br>
+
+Good-to-Have Match :
+{good_to_have_score}% × 0.10 = {good_to_have_contribution}
+
 <hr>
+
 <b>Final ATS Score = {score}%</b>
+
 </div>
         """,
         unsafe_allow_html=True
     )
 
-    # --------------------------------------------------------
-    # Keyword analysis
-    # --------------------------------------------------------
 
-    st.subheader("ATS Keyword Analysis")
+    # ========================================================
+    # ATS KEYWORD ANALYSIS
+    # ========================================================
+
+    st.subheader(
+        "ATS Keyword Analysis"
+    )
 
     overall_keyword_score = result.get(
-        "keyword_match_percentage", 0
+        "keyword_match_percentage",
+        0
     )
 
     k1, k2, k3 = st.columns(3)
 
     with k1:
-        st.metric("Required Keyword Match", f"{required_score}%")
+
+        st.metric(
+            "Required Keyword Match",
+            f"{required_score}%"
+        )
 
     with k2:
-        st.metric("Good-to-Have Match", f"{good_to_have_score}%")
 
-    with k3:
-        st.metric("Overall Keyword Match", f"{overall_keyword_score}%")
-
-    st.markdown("### Required Keywords")
-
-    rc1, rc2 = st.columns(2)
-
-    with rc1:
-        st.markdown("#### Matched")
-        matched_required = result.get(
-            "matched_required_keywords", []
-        )
-        if matched_required:
-            for keyword in matched_required:
-                st.write(f"✓ {keyword}")
-        else:
-            st.write("No required keywords matched.")
-
-    with rc2:
-        st.markdown("#### Missing")
-        missing_required = result.get(
-            "missing_required_keywords", []
-        )
-        if missing_required:
-            for keyword in missing_required:
-                st.write(f"• {keyword}")
-        else:
-            st.write("No required keywords are missing.")
-
-    st.markdown("### Good-to-Have Keywords")
-
-    gc1, gc2 = st.columns(2)
-
-    with gc1:
-        st.markdown("#### Matched")
-        matched_good = result.get(
-            "matched_good_to_have_keywords", []
-        )
-        if matched_good:
-            for keyword in matched_good:
-                st.write(f"✓ {keyword}")
-        else:
-            st.write("No good-to-have keywords matched.")
-
-    with gc2:
-        st.markdown("#### Missing")
-        missing_good = result.get(
-            "missing_good_to_have_keywords", []
-        )
-        if missing_good:
-            for keyword in missing_good:
-                st.write(f"• {keyword}")
-        else:
-            st.write("No good-to-have keywords are missing.")
-
-    # --------------------------------------------------------
-    # Technical Skill Match detail  # NEW
-    # --------------------------------------------------------
-
-    st.subheader("Technical Skill Match Detail")
-
-    st.caption(
-        "This component only considers REQUIRED technical skills. "
-        "Good-to-have skills are scored separately."
-    )
-
-    t1, t2, t3 = st.columns(3)
-
-    with t1:
-        st.metric("Technical Skill Match", f"{tech_score}%")
-
-    with t2:
-        st.metric(
-            "Required Technical Skills",
-            len(result.get("technical_matched_skills", []))
-            + len(result.get("technical_partial_skills", []))
-            + len(result.get("technical_missing_skills", []))
-        )
-
-    with t3:
         st.metric(
             "Good-to-Have Match",
             f"{good_to_have_score}%"
         )
 
-    # --------------------------------------------------------
-    # Skill Gap Analysis (deterministic)
-    # --------------------------------------------------------
+    with k3:
 
-    st.subheader("Skill Gap Analysis")
+        st.metric(
+            "Overall Keyword Match",
+            f"{overall_keyword_score}%"
+        )
 
-    skill_gap = result.get("skill_gap", {})
 
-    st.markdown("### 🔴 High-Priority Skill Gaps")
-    high_priority = skill_gap.get("high_priority_gaps", [])
-    if high_priority:
-        for skill in high_priority:
-            st.write(f"• {skill}")
-    else:
-        st.write("No major required skill gaps identified.")
+    # ========================================================
+    # REQUIRED KEYWORDS
+    # ========================================================
 
-    st.markdown("### 🟡 Partial / Related Skills")
-    partial_gaps = skill_gap.get("partial_matches", [])
-    if partial_gaps:
-        for skill in partial_gaps:
-            st.write(f"~ {skill}")
-    else:
-        st.write("No partial skill matches identified.")
-
-    st.markdown("### 🔵 Good-to-Have Gaps")
-    good_gaps = skill_gap.get("good_to_have_gaps", [])
-    if good_gaps:
-        for skill in good_gaps:
-            st.write(f"• {skill}")
-    else:
-        st.write("No good-to-have gaps identified.")
-
-    # --------------------------------------------------------
-    # Required JD skill lists  # CHANGED (renamed labels)
-    # --------------------------------------------------------
-
-    st.subheader("Required JD Skills")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("#### Matched JD Skills")
-        matched = result.get("matched_skills", [])
-        if matched:
-            for skill in matched:
-                st.write(f"✓ {skill}")
-        else:
-            st.write("No strong matches identified.")
-
-    with col2:
-        st.markdown("#### Missing JD Skills")
-        missing = result.get("missing_skills", [])
-        if missing:
-            for skill in missing:
-                st.write(f"• {skill}")
-        else:
-            st.write("No major missing skills identified.")
-
-    st.markdown("#### Partial / Related Skills")
-    partial = result.get("partial_match_skills", [])
-    if partial:
-        for skill in partial:
-            st.write(f"~ {skill}")
-    else:
-        st.write("No partial matches identified.")
-
-    # --------------------------------------------------------
-    # LLM narrative
-    # --------------------------------------------------------
-
-    st.subheader("Candidate Summary")
-    st.write(
-        result.get("candidate_summary", "No summary available.")
+    st.markdown(
+        "### Required Keywords"
     )
 
+    rc1, rc2 = st.columns(2)
+
+    with rc1:
+
+        st.markdown(
+            "#### Matched"
+        )
+
+        matched_required = result.get(
+            "matched_required_keywords",
+            []
+        )
+
+        if matched_required:
+
+            for keyword in matched_required:
+
+                st.write(
+                    f"✓ {keyword}"
+                )
+
+        else:
+
+            st.write(
+                "No required keywords matched."
+            )
+
+
+    with rc2:
+
+        st.markdown(
+            "#### Missing"
+        )
+
+        missing_required = result.get(
+            "missing_required_keywords",
+            []
+        )
+
+        if missing_required:
+
+            for keyword in missing_required:
+
+                st.write(
+                    f"• {keyword}"
+                )
+
+        else:
+
+            st.write(
+                "No required keywords are missing."
+            )
+
+
+    # ========================================================
+    # GOOD-TO-HAVE KEYWORDS
+    # ========================================================
+
+    st.markdown(
+        "### Good-to-Have Keywords"
+    )
+
+    gc1, gc2 = st.columns(2)
+
+    with gc1:
+
+        st.markdown(
+            "#### Matched"
+        )
+
+        matched_good = result.get(
+            "matched_good_to_have_keywords",
+            []
+        )
+
+        if matched_good:
+
+            for keyword in matched_good:
+
+                st.write(
+                    f"✓ {keyword}"
+                )
+
+        else:
+
+            st.write(
+                "No good-to-have keywords matched."
+            )
+
+
+    with gc2:
+
+        st.markdown(
+            "#### Missing"
+        )
+
+        missing_good = result.get(
+            "missing_good_to_have_keywords",
+            []
+        )
+
+        if missing_good:
+
+            for keyword in missing_good:
+
+                st.write(
+                    f"• {keyword}"
+                )
+
+        else:
+
+            st.write(
+                "No good-to-have keywords are missing."
+            )
+
+
+    # ========================================================
+    # TECHNICAL SKILL MATCH DETAIL
+    # ========================================================
+
+    st.subheader(
+        "Technical Skill Match Detail"
+    )
+
+    st.caption(
+        "This component considers REQUIRED technical "
+        "skills only. Skill categories are determined "
+        "from the job description."
+    )
+
+
+    technical_matched = result.get(
+        "technical_matched_skills",
+        []
+    )
+
+    technical_partial = result.get(
+        "technical_partial_skills",
+        []
+    )
+
+    technical_missing = result.get(
+        "technical_missing_skills",
+        []
+    )
+
+
+    total_technical_skills = (
+        len(technical_matched)
+        + len(technical_partial)
+        + len(technical_missing)
+    )
+
+
+    t1, t2 = st.columns(2)
+
+    with t1:
+
+        st.metric(
+            "Technical Skill Match",
+            f"{technical_score}%"
+        )
+
+    with t2:
+
+        st.metric(
+            "Required Technical Skills",
+            total_technical_skills
+        )
+
+
+    # ========================================================
+    # TECHNICAL SKILL BREAKDOWN
+    # ========================================================
+
+    tc1, tc2, tc3 = st.columns(3)
+
+    with tc1:
+
+        st.markdown(
+            "#### Matched Technical"
+        )
+
+        if technical_matched:
+
+            for skill in technical_matched:
+
+                st.write(
+                    f"✓ {skill}"
+                )
+
+        else:
+
+            st.write(
+                "None"
+            )
+
+
+    with tc2:
+
+        st.markdown(
+            "#### Partial Technical"
+        )
+
+        if technical_partial:
+
+            for skill in technical_partial:
+
+                st.write(
+                    f"~ {skill}"
+                )
+
+        else:
+
+            st.write(
+                "None"
+            )
+
+
+    with tc3:
+
+        st.markdown(
+            "#### Missing Technical"
+        )
+
+        if technical_missing:
+
+            for skill in technical_missing:
+
+                st.write(
+                    f"• {skill}"
+                )
+
+        else:
+
+            st.write(
+                "None"
+            )
+
+
+    # ========================================================
+    # NON-TECHNICAL REQUIREMENTS
+    # ========================================================
+
+    st.subheader(
+        "Other Required Skills"
+    )
+
+    st.caption(
+        "These requirements are part of the job description "
+        "but are not included in the Technical Skill Match."
+    )
+
+    required_non_technical = result.get(
+        "required_non_technical_skills",
+        []
+    )
+
+    if required_non_technical:
+
+        for skill in required_non_technical:
+
+            if skill in result.get(
+                "matched_skills",
+                []
+            ):
+
+                st.write(
+                    f"✓ {skill}"
+                )
+
+            else:
+
+                st.write(
+                    f"• {skill}"
+                )
+
+    else:
+
+        st.write(
+            "No non-technical or foundational requirements "
+            "were identified."
+        )
+
+
+    # ========================================================
+    # SKILL GAP ANALYSIS
+    # ========================================================
+
+    st.subheader(
+        "Skill Gap Analysis"
+    )
+
+    skill_gap = result.get(
+        "skill_gap",
+        {}
+    )
+
+
+    # --------------------------------------------------------
+    # High priority
+    # --------------------------------------------------------
+
+    st.markdown(
+        "### 🔴 High-Priority Skill Gaps"
+    )
+
+    high_priority = skill_gap.get(
+        "high_priority_gaps",
+        []
+    )
+
+    if high_priority:
+
+        for skill in high_priority:
+
+            st.write(
+                f"• {skill}"
+            )
+
+    else:
+
+        st.write(
+            "No major required skill gaps identified."
+        )
+
+
+    # --------------------------------------------------------
+    # Partial required
+    # --------------------------------------------------------
+
+    st.markdown(
+        "### 🟡 Partial / Related Skills"
+    )
+
+    partial_gaps = skill_gap.get(
+        "partial_matches",
+        []
+    )
+
+    if partial_gaps:
+
+        for skill in partial_gaps:
+
+            st.write(
+                f"~ {skill}"
+            )
+
+    else:
+
+        st.write(
+            "No partial required-skill matches identified."
+        )
+
+
+    # --------------------------------------------------------
+    # Good-to-have gaps
+    # --------------------------------------------------------
+
+    st.markdown(
+        "### 🔵 Good-to-Have Gaps"
+    )
+
+    good_gaps = skill_gap.get(
+        "good_to_have_gaps",
+        []
+    )
+
+    if good_gaps:
+
+        for skill in good_gaps:
+
+            st.write(
+                f"• {skill}"
+            )
+
+    else:
+
+        st.write(
+            "No good-to-have gaps identified."
+        )
+
+
+    # ========================================================
+    # REQUIRED JD SKILLS
+    # ========================================================
+
+    st.subheader(
+        "Required JD Skills"
+    )
+
+
+    # --------------------------------------------------------
+    # Matched required
+    # --------------------------------------------------------
+
+    st.markdown(
+        "#### Matched Required Skills"
+    )
+
+    matched_required_skills = result.get(
+        "matched_skills",
+        []
+    )
+
+    if matched_required_skills:
+
+        for skill in matched_required_skills:
+
+            st.write(
+                f"✓ {skill}"
+            )
+
+    else:
+
+        st.write(
+            "No required skills matched."
+        )
+
+
+    # --------------------------------------------------------
+    # Partial required
+    # --------------------------------------------------------
+
+    st.markdown(
+        "#### Partial / Related Required Skills"
+    )
+
+    partial_required_skills = result.get(
+        "partial_match_skills",
+        []
+    )
+
+    if partial_required_skills:
+
+        for skill in partial_required_skills:
+
+            st.write(
+                f"~ {skill}"
+            )
+
+    else:
+
+        st.write(
+            "No partial required skills identified."
+        )
+
+
+    # --------------------------------------------------------
+    # Missing required
+    # --------------------------------------------------------
+
+    st.markdown(
+        "#### Missing Required Skills"
+    )
+
+    missing_required_skills = result.get(
+        "missing_skills",
+        []
+    )
+
+    if missing_required_skills:
+
+        for skill in missing_required_skills:
+
+            st.write(
+                f"• {skill}"
+            )
+
+    else:
+
+        st.write(
+            "No required skills are missing."
+        )
+
+
+    # ========================================================
+    # CANDIDATE SUMMARY
+    # ========================================================
+
+    st.subheader(
+        "Candidate Summary"
+    )
+
+    st.write(
+        result.get(
+            "candidate_summary",
+            "No summary available."
+        )
+    )
+
+
+    # ========================================================
+    # STRENGTHS / WEAKNESSES
+    # ========================================================
+
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Strengths")
-        strengths = result.get("strengths", [])
+
+        st.subheader(
+            "Strengths"
+        )
+
+        strengths = result.get(
+            "strengths",
+            []
+        )
+
         if strengths:
+
             for item in strengths:
-                st.write(f"✓ {item}")
+
+                st.write(
+                    f"✓ {item}"
+                )
+
         else:
-            st.write("No strengths identified.")
+
+            st.write(
+                "No strengths identified."
+            )
+
 
     with col2:
-        st.subheader("Weaknesses")
-        weaknesses = result.get("weaknesses", [])
+
+        st.subheader(
+            "Weaknesses"
+        )
+
+        weaknesses = result.get(
+            "weaknesses",
+            []
+        )
+
         if weaknesses:
+
             for item in weaknesses:
-                st.write(f"• {item}")
+
+                st.write(
+                    f"• {item}"
+                )
+
         else:
-            st.write("No weaknesses identified.")
 
-    st.subheader("Experience Match")
-    st.write(result.get("experience_match", "Not available."))
+            st.write(
+                "No weaknesses identified."
+            )
 
-    st.subheader("Education Match")
-    st.write(result.get("education_match", "Not available."))
 
-    st.subheader("Project Match")
-    st.write(result.get("project_match", "Not available."))
+    # ========================================================
+    # EXPERIENCE MATCH
+    # ========================================================
 
-    st.subheader("Resume Improvement Recommendations")
-    improvements = result.get("resume_improvements", [])
+    st.subheader(
+        "Experience Match"
+    )
+
+    st.write(
+        result.get(
+            "experience_match",
+            "Not available."
+        )
+    )
+
+
+    # ========================================================
+    # EDUCATION MATCH
+    # ========================================================
+
+    st.subheader(
+        "Education Match"
+    )
+
+    st.write(
+        result.get(
+            "education_match",
+            "Not available."
+        )
+    )
+
+
+    # ========================================================
+    # PROJECT MATCH
+    # ========================================================
+
+    st.subheader(
+        "Project Match"
+    )
+
+    st.write(
+        result.get(
+            "project_match",
+            "Not available."
+        )
+    )
+
+
+    # ========================================================
+    # RESUME IMPROVEMENTS
+    # ========================================================
+
+    st.subheader(
+        "Resume Improvement Recommendations"
+    )
+
+    improvements = result.get(
+        "resume_improvements",
+        []
+    )
+
     if improvements:
-        for index, item in enumerate(improvements, start=1):
-            st.write(f"{index}. {item}")
-    else:
-        st.write("No improvement recommendations available.")
 
-    st.subheader("AI-Generated Interview Questions")
-    questions = result.get("interview_questions", [])
+        for index, item in enumerate(
+            improvements,
+            start=1
+        ):
+
+            st.write(
+                f"{index}. {item}"
+            )
+
+    else:
+
+        st.write(
+            "No improvement recommendations available."
+        )
+
+
+    # ========================================================
+    # INTERVIEW QUESTIONS
+    # ========================================================
+
+    st.subheader(
+        "AI-Generated Interview Questions"
+    )
+
+    questions = result.get(
+        "interview_questions",
+        []
+    )
+
     if questions:
-        for index, question in enumerate(questions, start=1):
-            st.write(f"{index}. {question}")
-    else:
-        st.write("No interview questions generated.")
 
-    with st.expander("Generate General Resume Improvement Tips"):
-        if st.button("Generate Tips"):
-            with st.spinner("Generating recommendations..."):
+        for index, question in enumerate(
+            questions,
+            start=1
+        ):
+
+            st.write(
+                f"{index}. {question}"
+            )
+
+    else:
+
+        st.write(
+            "No interview questions generated."
+        )
+
+
+    # ========================================================
+    # GENERAL RESUME TIPS
+    # ========================================================
+
+    with st.expander(
+        "Generate General Resume Improvement Tips"
+    ):
+
+        if st.button(
+            "Generate Tips"
+        ):
+
+            with st.spinner(
+                "Generating recommendations..."
+            ):
+
                 try:
+
                     tips = generate_resume_tips(
-                        st.session_state["resume_text"]
+                        st.session_state[
+                            "resume_text"
+                        ]
                     )
-                    st.write(tips)
+
+                    st.write(
+                        tips
+                    )
+
                 except Exception as e:
-                    st.error(f"Unable to generate tips: {e}")
+
+                    st.error(
+                        f"Unable to generate tips: {e}"
+                    )
 
 
 # ============================================================
@@ -856,4 +1960,7 @@ Good-to-Have Match     : {good_to_have_score}% × 0.10 = {good_contrib}<br>
 # ============================================================
 
 st.divider()
-st.caption("AI Resume Analyzer | Python + Streamlit + Groq")
+
+st.caption(
+    "AI Resume Analyzer | Python + Streamlit + Groq"
+)

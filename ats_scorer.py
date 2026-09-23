@@ -1,41 +1,92 @@
 # ============================================================
-# SKILL MATCH (used for the Technical Skill component)
+# TECHNICAL SKILL MATCH
 # ============================================================
 
 def calculate_skill_match(
-    matched_skills,
-    missing_skills,
-    partial_match_skills
+    matched_technical_skills,
+    missing_technical_skills,
+    partial_technical_skills
 ):
     """
-    Deterministic skill-match percentage.
+    Calculate the Technical Skill Match percentage.
 
-    Full match    = 1.0
-    Partial match = 0.5
-    Missing       = 0.0
+    IMPORTANT:
+    These lists MUST contain TECHNICAL skills only.
 
-    Inputs MUST be the TECHNICAL-only classification lists,
-    produced by:
-        keyword_analyzer.split_technical_skills(...)
-        keyword_analyzer.match_deterministic_skills(...)
+    Scoring:
+        Full match    = 1.0
+        Partial match = 0.5
+        Missing       = 0.0
+
+    Formula:
+
+        Technical Skill Match =
+            (
+                matched
+                + (partial × 0.5)
+            )
+            / total technical skills
+            × 100
+
+    Example:
+
+        Matched  = 4
+        Partial  = 2
+        Missing  = 2
+
+        Weighted score = 4 + (2 × 0.5)
+                       = 5
+
+        Total = 4 + 2 + 2
+              = 8
+
+        Technical Skill Match
+            = 5 / 8 × 100
+            = 62.5
+            ≈ 63%
     """
 
-    matched_count = len(matched_skills)
-    missing_count = len(missing_skills)
-    partial_count = len(partial_match_skills)
+    matched_count = len(
+        matched_technical_skills
+    )
 
-    total = matched_count + missing_count + partial_count
+    partial_count = len(
+        partial_technical_skills
+    )
 
-    if total == 0:
+    missing_count = len(
+        missing_technical_skills
+    )
+
+    total_technical_skills = (
+        matched_count
+        + partial_count
+        + missing_count
+    )
+
+    # Avoid division by zero when the JD contains
+    # no technical skills.
+    if total_technical_skills == 0:
         return 0
 
-    weighted = matched_count + (partial_count * 0.5)
+    weighted_score = (
+        matched_count
+        + (partial_count * 0.5)
+    )
 
-    return round(weighted / total * 100)
+    technical_skill_percentage = (
+        weighted_score
+        / total_technical_skills
+        * 100
+    )
+
+    return round(
+        technical_skill_percentage
+    )
 
 
 # ============================================================
-# ATS SCORE
+# FINAL ATS SCORE
 # ============================================================
 
 def calculate_ats_score(
@@ -44,12 +95,22 @@ def calculate_ats_score(
     good_to_have_percentage
 ):
     """
-    Final deterministic ATS score.
+    Calculate the final deterministic ATS score.
 
     Components:
-        Required Keyword Match  (all required keywords)     50%
-        Technical Skill Match   (required technical only)   40%
-        Good-to-Have Match      (optional keywords)         10%
+
+        Required Keyword Match = 50%
+        Technical Skill Match  = 40%
+        Good-to-Have Match     = 10%
+
+    Formula:
+
+        ATS Score =
+            (Required Keyword Match × 0.50)
+            +
+            (Technical Skill Match × 0.40)
+            +
+            (Good-to-Have Match × 0.10)
     """
 
     ats_score = (
@@ -58,4 +119,6 @@ def calculate_ats_score(
         + good_to_have_percentage * 0.10
     )
 
-    return round(ats_score)
+    return round(
+        ats_score
+    )
