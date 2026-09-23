@@ -5,6 +5,9 @@ import json
 # ============================================================
 # KEYWORD ALIASES
 # ============================================================
+# Aliases define what counts as EXACT presence of a skill.
+# Keep these conservative — overly broad aliases cause
+# false-positive matches in an ATS context.
 
 KEYWORD_ALIASES = {
     "java": ["java"],
@@ -32,11 +35,17 @@ KEYWORD_ALIASES = {
     "problem solving": [
         "problem solving",
         "problem-solving",
-        "problem solving skills"
+        "problem solving skills",
+        "analytical skills",
+        "analytical thinking"
     ],
+    # NOTE: "communication" alone is too broad
+    # (e.g. "communication between client and server").
     "communication skills": [
         "communication skills",
-        "communication"
+        "verbal communication",
+        "written communication",
+        "interpersonal skills"
     ],
     "code reviews": ["code review", "code reviews"],
     "debugging": ["debugging", "debug", "debugged"],
@@ -56,49 +65,69 @@ KEYWORD_ALIASES = {
 
 
 # ============================================================
-# SKILL TAXONOMY
+# TECHNICAL vs. NON-TECHNICAL
 # ============================================================
+# Skills listed here are treated as non-technical for the
+# purpose of the "Technical Skill Match" component of the
+# ATS score. They still count toward "Required Keyword Match".
 
-SKILL_TAXONOMY = {
-    "languages": [
-        "java",
-        "javascript",
-        "typescript",
-        "python",
-        "sql"
-    ],
-    "backend_frameworks": [
-        "spring boot",
-        "fastapi",
-        "flask"
-    ],
-    "frontend_frameworks": [
-        "react",
-        "next.js",
-        "flutter"
-    ],
-    "databases": [
-        "mysql",
-        "sqlite",
-        "mongodb"
-    ],
-    "cloud_devops": [
-        "docker",
-        "aws"
-    ],
-    "version_control": [
-        "git",
-        "github"
-    ],
-    "concepts": [
-        "object oriented programming",
-        "data structures and algorithms",
-        "rest apis",
-        "problem solving",
-        "communication skills",
-        "code reviews",
-        "debugging"
-    ]
+NON_TECHNICAL_SKILLS = {
+    "communication skills",
+    "problem solving"
+}
+
+
+def is_technical_skill(skill):
+    return normalize_skill(skill) not in NON_TECHNICAL_SKILLS
+
+
+# ============================================================
+# SKILL RELATIONS (explicit "partial" links)
+# ============================================================
+# If the JD requires skill X and the resume contains Y,
+# and Y is listed as a relation of X, then X is a PARTIAL
+# match. Otherwise, X is MISSING.
+#
+# Keep this list narrow and defensible.
+
+SKILL_RELATIONS = {
+    # Backend frameworks
+    "spring boot": ["fastapi", "flask"],
+    "fastapi": ["flask", "spring boot"],
+    "flask": ["fastapi", "spring boot"],
+
+    # Frontend
+    "react": ["next.js"],
+    "next.js": ["react"],
+    "flutter": [],
+
+    # Databases
+    "mysql": ["sqlite", "mongodb"],
+    "sqlite": ["mysql"],
+    "mongodb": ["mysql", "sqlite"],
+
+    # Languages — deliberately narrow
+    # Java <-> JavaScript is NOT a relation.
+    # Java <-> Python is NOT a relation.
+    "javascript": ["typescript"],
+    "typescript": ["javascript"],
+    "java": [],
+    "python": [],
+
+    # Cloud / DevOps
+    "docker": [],
+    "aws": [],
+
+    # Version control
+    "git": ["github"],
+    "github": ["git"],
+
+    # Technical concepts
+    "rest apis": [],
+    "object oriented programming": [],
+    "data structures and algorithms": [],
+    "debugging": ["code reviews"],
+    "code reviews": ["debugging"]
 }
 
 
@@ -144,10 +173,6 @@ def phrase_exists(phrase, resume_text):
     return re.search(pattern, resume_text) is not None
 
 
-# ============================================================
-# KEYWORD MATCHING
-# ============================================================
-
 def keyword_exists(keyword, resume_text):
     keyword_normalized = normalize_text(keyword)
 
@@ -164,8 +189,7 @@ def keyword_exists(keyword, resume_text):
 
 
 def match_keyword_list(keywords, resume_text):
-    matched = []
-    missing = []
+    matched, missing = [], []
 
     for keyword in keywords:
         if keyword_exists(keyword, resume_text):
@@ -177,57 +201,51 @@ def match_keyword_list(keywords, resume_text):
 
 
 # ============================================================
-# SKILL TAXONOMY HELPERS
+# EXPLICIT PARTIAL-MATCH LOOKUP
 # ============================================================
 
-def get_skill_category(skill):
+def _has_explicit_relation(skill, resume_text):
+    """
+    Return True if the resume contains a skill that is
+    explicitly listed as a relation of `skill`.
+    """
+
     normalized = normalize_skill(skill)
 
-    if not normalized:
-        return None
-
-    for category, skills in SKILL_TAXONOMY.items():
-        if normalized in skills:
-            return category
-
-    return None
-
-
-def resume_has_category(category, resume_text):
-    if not category:
-        return False
-
-    for skill in SKILL_TAXONOMY.get(category, []):
-        if keyword_exists(skill, resume_text):
+    for related in SKILL_RELATIONS.get(normalized, []):
+        if keyword_exists(related, resume_text):
             return True
 
     return False
 
 
 # ============================================================
-# DETERMINISTIC SKILL MATCHING
+# DETERMINISTIC CLASSIFICATION
 # ============================================================
 
-def _classify_skills(skills, resume_text):
+def _classify(skill, resume_text):
     """
-    Classify a list of JD skills against the resume.
-
-    Returns (matched, partial, missing) lists.
+    Classify a single skill as 'matched', 'partial', or 'missing'.
     """
 
-    matched = []
-    partial = []
-    missing = []
+    if keyword_exists(skill, resume_text):
+        return "matched"
+
+    if _has_explicit_relation(skill, resume_text):
+        return "partial"
+
+    return "missing"
+
+
+def _classify_list(skills, resume_text):
+    matched, partial, missing = [], [], []
 
     for skill in skills:
+        verdict = _classify(skill, resume_text)
 
-        if keyword_exists(skill, resume_text):
+        if verdict == "matched":
             matched.append(skill)
-            continue
-
-        category = get_skill_category(skill)
-
-        if resume_has_category(category, resume_text):
+        elif verdict == "partial":
             partial.append(skill)
         else:
             missing.append(skill)
@@ -243,54 +261,62 @@ def match_deterministic_skills(
     """
     Deterministic classification of JD skills.
 
-    Full match    -> skill (or alias) exists in resume
-    Partial match -> skill missing, but resume contains
-                     another skill from the same category
-    Missing       -> skill missing AND no related skill
-                     present in resume
+    Matched  -> skill (or alias) present in resume
+    Partial  -> skill missing, but an EXPLICITLY RELATED skill
+                is present in the resume
+    Missing  -> neither the skill nor any related skill present
 
-    This is the SINGLE SOURCE OF TRUTH for the
-    matched / partial / missing classification used
-    by the ATS scorer and the skill-gap analyzer.
+    This is the SINGLE SOURCE OF TRUTH for ATS scoring and
+    for the skill-gap analysis.
     """
 
-    (
-        matched_required,
-        partial_required,
-        missing_required
-    ) = _classify_skills(required_skills, resume_text)
+    matched_r, partial_r, missing_r = _classify_list(
+        required_skills, resume_text
+    )
 
-    (
-        matched_good,
-        partial_good,
-        missing_good
-    ) = _classify_skills(good_to_have_skills, resume_text)
-
-    # Combined lists (used for skill-match scoring)
-    matched_skills = matched_required + matched_good
-    partial_match_skills = partial_required + partial_good
-    missing_skills = missing_required + missing_good
+    matched_g, partial_g, missing_g = _classify_list(
+        good_to_have_skills, resume_text
+    )
 
     return {
-        # Required
-        "matched_required": matched_required,
-        "partial_required": partial_required,
-        "missing_required": missing_required,
+        "matched_required": matched_r,
+        "partial_required": partial_r,
+        "missing_required": missing_r,
 
-        # Good-to-have
-        "matched_good_to_have": matched_good,
-        "partial_good_to_have": partial_good,
-        "missing_good_to_have": missing_good,
+        "matched_good_to_have": matched_g,
+        "partial_good_to_have": partial_g,
+        "missing_good_to_have": missing_g,
 
-        # Combined
-        "matched_skills": matched_skills,
-        "partial_match_skills": partial_match_skills,
-        "missing_skills": missing_skills
+        # Combined (used by skill-gap display)
+        "matched_skills": matched_r + matched_g,
+        "partial_match_skills": partial_r + partial_g,
+        "missing_skills": missing_r + missing_g
     }
 
 
 # ============================================================
-# KEYWORD ANALYSIS
+# TECHNICAL-SKILL FILTER
+# ============================================================
+
+def split_technical_skills(skills):
+    """
+    Split a list of skills into (technical, non_technical).
+    Used to compute the Technical Skill Match component.
+    """
+
+    technical, non_technical = [], []
+
+    for skill in skills:
+        if is_technical_skill(skill):
+            technical.append(skill)
+        else:
+            non_technical.append(skill)
+
+    return technical, non_technical
+
+
+# ============================================================
+# KEYWORD ANALYSIS (for display)
 # ============================================================
 
 def calculate_keyword_match(
@@ -298,12 +324,11 @@ def calculate_keyword_match(
     good_to_have_keywords,
     resume_text
 ):
-    matched_required, missing_required = (
-        match_keyword_list(required_keywords, resume_text)
+    matched_required, missing_required = match_keyword_list(
+        required_keywords, resume_text
     )
-
-    matched_good, missing_good = (
-        match_keyword_list(good_to_have_keywords, resume_text)
+    matched_good, missing_good = match_keyword_list(
+        good_to_have_keywords, resume_text
     )
 
     if required_keywords:
@@ -320,19 +345,12 @@ def calculate_keyword_match(
     else:
         good_to_have_percentage = 0
 
-    total_keywords = (
-        len(required_keywords) + len(good_to_have_keywords)
-    )
-    total_matched = (
-        len(matched_required) + len(matched_good)
-    )
+    total = len(required_keywords) + len(good_to_have_keywords)
+    total_matched = len(matched_required) + len(matched_good)
 
-    if total_keywords:
-        overall_percentage = round(
-            total_matched / total_keywords * 100
-        )
-    else:
-        overall_percentage = 0
+    overall_percentage = (
+        round(total_matched / total * 100) if total else 0
+    )
 
     return {
         "matched_required": matched_required,
@@ -346,7 +364,7 @@ def calculate_keyword_match(
 
 
 # ============================================================
-# AI KEYWORD EXTRACTION (JD -> required / good-to-have)
+# AI KEYWORD EXTRACTION
 # ============================================================
 
 def extract_keywords_from_jd(client, model, job_description):
@@ -440,8 +458,7 @@ JOB DESCRIPTION:
         good_to_have_keywords = []
 
     def clean_keywords(keywords):
-        cleaned = []
-        seen = set()
+        cleaned, seen = [], set()
         for keyword in keywords:
             if not isinstance(keyword, str):
                 continue

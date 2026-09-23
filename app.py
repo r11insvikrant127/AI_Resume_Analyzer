@@ -10,7 +10,8 @@ from groq import Groq
 from keyword_analyzer import (
     extract_keywords_from_jd,
     calculate_keyword_match,
-    match_deterministic_skills
+    match_deterministic_skills,
+    split_technical_skills          # NEW
 )
 
 from ats_scorer import (
@@ -70,6 +71,13 @@ st.markdown(
         font-size: 18px;
         color: #666;
         margin-bottom: 25px;
+    }
+    .formula {
+        font-family: monospace;
+        background: #f6f6f6;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 1px solid #e2e2e2;
     }
     </style>
     """,
@@ -184,7 +192,6 @@ JOB DESCRIPTION:
 
 def parse_json_response(content):
     content = content.strip()
-
     content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
     content = re.sub(r"^```\s*", "", content)
     content = re.sub(r"\s*```$", "", content)
@@ -208,7 +215,6 @@ Review this resume as a professional technical recruiter.
 Provide 8 practical recommendations to improve it.
 
 Focus on:
-
 - ATS compatibility
 - Technical skills
 - Project descriptions
@@ -244,6 +250,31 @@ Return only a numbered list.
 
 
 # ============================================================
+# CACHED JD KEYWORD EXTRACTION   # NEW
+# ============================================================
+
+def get_jd_keywords(job_description):
+    """
+    Cache JD keyword extraction per unique JD within the
+    Streamlit session. Avoids re-calling Groq on repeated
+    "Analyze Resume" presses for the same JD.
+    """
+
+    cache = st.session_state.setdefault("jd_keyword_cache", {})
+    key = job_description.strip()
+
+    if key in cache:
+        return cache[key]
+
+    keyword_data = extract_keywords_from_jd(
+        client, MODEL, job_description
+    )
+
+    cache[key] = keyword_data
+    return keyword_data
+
+
+# ============================================================
 # SIDEBAR
 # ============================================================
 
@@ -253,8 +284,9 @@ with st.sidebar:
 
     st.write(
         """
-        This application uses Generative AI to compare a
-        candidate's resume with a job description.
+        This application uses Generative AI for qualitative
+        analysis and deterministic Python for ATS scoring
+        and skill matching.
         """
     )
 
@@ -288,13 +320,11 @@ with st.sidebar:
 
         Keyword Analysis
 
-        Skill Match
+        Technical Skill Match
 
         Skill Gaps
 
-        Strengths
-
-        Weaknesses
+        Strengths / Weaknesses
 
         Resume Improvements
 
@@ -355,9 +385,9 @@ if analyze_button:
     with st.spinner("Reading and analyzing resume..."):
 
         try:
-            # ================================================
-            # EXTRACT RESUME TEXT
-            # ================================================
+            # --------------------------------------------------
+            # Resume text
+            # --------------------------------------------------
 
             resume_text = extract_resume_text(uploaded_file)
             resume_text = clean_text(resume_text)
@@ -369,19 +399,17 @@ if analyze_button:
                 )
                 st.stop()
 
-            # ================================================
-            # AI NARRATIVE ANALYSIS (no scoring, no skills)
-            # ================================================
+            # --------------------------------------------------
+            # LLM narrative
+            # --------------------------------------------------
 
             result = analyze_resume(resume_text, job_description)
 
-            # ================================================
-            # AI KEYWORD EXTRACTION FROM JD
-            # ================================================
+            # --------------------------------------------------
+            # JD keywords (cached)
+            # --------------------------------------------------
 
-            keyword_data = extract_keywords_from_jd(
-                client, MODEL, job_description
-            )
+            keyword_data = get_jd_keywords(job_description)
 
             required_keywords = keyword_data.get(
                 "required_keywords", []
@@ -390,9 +418,9 @@ if analyze_button:
                 "good_to_have_keywords", []
             )
 
-            # ================================================
-            # DETERMINISTIC KEYWORD ANALYSIS
-            # ================================================
+            # --------------------------------------------------
+            # Required keyword match (all required keywords)
+            # --------------------------------------------------
 
             keyword_analysis = calculate_keyword_match(
                 required_keywords,
@@ -400,9 +428,9 @@ if analyze_button:
                 resume_text
             )
 
-            # ================================================
-            # DETERMINISTIC SKILL CLASSIFICATION
-            # ================================================
+            # --------------------------------------------------
+            # Deterministic skill classification
+            # --------------------------------------------------
 
             det = match_deterministic_skills(
                 required_skills=required_keywords,
@@ -410,23 +438,45 @@ if analyze_button:
                 resume_text=resume_text
             )
 
-            matched_skills = det["matched_skills"]
-            partial_match_skills = det["partial_match_skills"]
-            missing_skills = det["missing_skills"]
+            # --------------------------------------------------
+            # Split required skills into technical vs non-technical
+            # -> used for the Technical Skill Match component
+            # --------------------------------------------------
 
-            # ================================================
-            # DETERMINISTIC SKILL MATCH SCORE
-            # ================================================
-
-            skill_match_percentage = calculate_skill_match(
-                matched_skills,
-                missing_skills,
-                partial_match_skills
+            required_technical, required_non_technical = (
+                split_technical_skills(
+                    det["matched_required"]
+                    + det["partial_required"]
+                    + det["missing_required"]
+                )
             )
 
-            # ================================================
-            # DETERMINISTIC SKILL GAP ANALYSIS
-            # ================================================
+            def subset(skills, pool):
+                return [s for s in skills if s in pool]
+
+            tech_matched = subset(
+                det["matched_required"], required_technical
+            )
+            tech_partial = subset(
+                det["partial_required"], required_technical
+            )
+            tech_missing = subset(
+                det["missing_required"], required_technical
+            )
+
+            # --------------------------------------------------
+            # Technical Skill Match %
+            # --------------------------------------------------
+
+            technical_skill_percentage = calculate_skill_match(
+                tech_matched,
+                tech_missing,
+                tech_partial
+            )
+
+            # --------------------------------------------------
+            # Skill-gap analysis (deterministic)
+            # --------------------------------------------------
 
             skill_gap = build_skill_gap_analysis(
                 matched_required=det["matched_required"],
@@ -437,19 +487,19 @@ if analyze_button:
                 missing_good_to_have=det["missing_good_to_have"]
             )
 
-            # ================================================
-            # DETERMINISTIC ATS SCORE
-            # ================================================
+            # --------------------------------------------------
+            # Final ATS score
+            # --------------------------------------------------
 
             ats_score = calculate_ats_score(
                 keyword_analysis["required_percentage"],
-                keyword_analysis["good_to_have_percentage"],
-                skill_match_percentage
+                technical_skill_percentage,
+                keyword_analysis["good_to_have_percentage"]
             )
 
-            # ================================================
-            # STORE RESULTS
-            # ================================================
+            # --------------------------------------------------
+            # Store results
+            # --------------------------------------------------
 
             result["required_keywords"] = required_keywords
             result["good_to_have_keywords"] = good_to_have_keywords
@@ -477,11 +527,20 @@ if analyze_button:
                 keyword_analysis["overall_percentage"]
             )
 
-            result["matched_skills"] = matched_skills
-            result["partial_match_skills"] = partial_match_skills
-            result["missing_skills"] = missing_skills
+            # Technical-only skill lists (used by UI + scoring)
+            result["technical_matched_skills"] = tech_matched
+            result["technical_partial_skills"] = tech_partial
+            result["technical_missing_skills"] = tech_missing
+            result["technical_skill_percentage"] = (
+                technical_skill_percentage
+            )
 
-            result["skill_match_percentage"] = skill_match_percentage
+            # Full required skill lists (for display)
+            result["matched_skills"] = det["matched_required"]
+            result["partial_match_skills"] = det["partial_required"]
+            result["missing_skills"] = det["missing_required"]
+
+            result["skill_match_percentage"] = technical_skill_percentage
             result["ats_score"] = ats_score
             result["skill_gap"] = skill_gap
 
@@ -507,49 +566,58 @@ if "analysis" in st.session_state:
     st.header("Resume Analysis Report")
 
     # --------------------------------------------------------
-    # SCORE METRICS
+    # Headline metrics
     # --------------------------------------------------------
 
     score = result.get("ats_score", 0)
-    skill_score = result.get("skill_match_percentage", 0)
     required_score = result.get("required_keyword_percentage", 0)
+    tech_score = result.get("technical_skill_percentage", 0)
     good_to_have_score = result.get("good_to_have_percentage", 0)
 
-    score_col1, score_col2, score_col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-    with score_col1:
+    with c1:
         st.metric("ATS Score", f"{score}%")
 
-    with score_col2:
-        st.metric("Skill Match", f"{skill_score}%")
+    with c2:
+        st.metric(
+            "Required Keyword Match",
+            f"{required_score}%"
+        )
 
-    with score_col3:
-        st.metric("Required Keyword Match", f"{required_score}%")
+    with c3:
+        st.metric(
+            "Technical Skill Match",
+            f"{tech_score}%"
+        )
 
     st.progress(min(max(score, 0), 100) / 100)
 
     # --------------------------------------------------------
-    # SCORE BREAKDOWN
+    # Explicit score calculation  # NEW
     # --------------------------------------------------------
 
-    st.subheader("ATS Score Breakdown")
+    st.subheader("How This ATS Score Was Calculated")
 
-    b1, b2, b3 = st.columns(3)
+    req_contrib = round(required_score * 0.50, 2)
+    tech_contrib = round(tech_score * 0.40, 2)
+    good_contrib = round(good_to_have_score * 0.10, 2)
 
-    with b1:
-        st.metric("Required Keywords", f"{required_score}%")
-        st.caption("Weight: 50%")
-
-    with b2:
-        st.metric("Skill Match", f"{skill_score}%")
-        st.caption("Weight: 40%")
-
-    with b3:
-        st.metric("Good-to-Have", f"{good_to_have_score}%")
-        st.caption("Weight: 10%")
+    st.markdown(
+        f"""
+<div class="formula">
+Required Keyword Match : {required_score}% × 0.50 = {req_contrib}<br>
+Technical Skill Match  : {tech_score}% × 0.40 = {tech_contrib}<br>
+Good-to-Have Match     : {good_to_have_score}% × 0.10 = {good_contrib}<br>
+<hr>
+<b>Final ATS Score = {score}%</b>
+</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     # --------------------------------------------------------
-    # KEYWORD ANALYSIS
+    # Keyword analysis
     # --------------------------------------------------------
 
     st.subheader("ATS Keyword Analysis")
@@ -622,7 +690,37 @@ if "analysis" in st.session_state:
             st.write("No good-to-have keywords are missing.")
 
     # --------------------------------------------------------
-    # SKILL GAP ANALYSIS
+    # Technical Skill Match detail  # NEW
+    # --------------------------------------------------------
+
+    st.subheader("Technical Skill Match Detail")
+
+    st.caption(
+        "This component only considers REQUIRED technical skills. "
+        "Good-to-have skills are scored separately."
+    )
+
+    t1, t2, t3 = st.columns(3)
+
+    with t1:
+        st.metric("Technical Skill Match", f"{tech_score}%")
+
+    with t2:
+        st.metric(
+            "Required Technical Skills",
+            len(result.get("technical_matched_skills", []))
+            + len(result.get("technical_partial_skills", []))
+            + len(result.get("technical_missing_skills", []))
+        )
+
+    with t3:
+        st.metric(
+            "Good-to-Have Match",
+            f"{good_to_have_score}%"
+        )
+
+    # --------------------------------------------------------
+    # Skill Gap Analysis (deterministic)
     # --------------------------------------------------------
 
     st.subheader("Skill Gap Analysis")
@@ -637,7 +735,7 @@ if "analysis" in st.session_state:
     else:
         st.write("No major required skill gaps identified.")
 
-    st.markdown("### 🟡 Partial / Needs More Evidence")
+    st.markdown("### 🟡 Partial / Related Skills")
     partial_gaps = skill_gap.get("partial_matches", [])
     if partial_gaps:
         for skill in partial_gaps:
@@ -646,113 +744,4 @@ if "analysis" in st.session_state:
         st.write("No partial skill matches identified.")
 
     st.markdown("### 🔵 Good-to-Have Gaps")
-    good_gaps = skill_gap.get("good_to_have_gaps", [])
-    if good_gaps:
-        for skill in good_gaps:
-            st.write(f"• {skill}")
-    else:
-        st.write("No good-to-have gaps identified.")
-
-    # --------------------------------------------------------
-    # NARRATIVE SECTIONS (from LLM)
-    # --------------------------------------------------------
-
-    st.subheader("Candidate Summary")
-    st.write(
-        result.get(
-            "candidate_summary",
-            "No summary available."
-        )
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Matched Skills")
-        matched = result.get("matched_skills", [])
-        if matched:
-            for skill in matched:
-                st.write(f"✓ {skill}")
-        else:
-            st.write("No strong matches identified.")
-
-    with col2:
-        st.subheader("Missing Skills")
-        missing = result.get("missing_skills", [])
-        if missing:
-            for skill in missing:
-                st.write(f"• {skill}")
-        else:
-            st.write("No major missing skills identified.")
-
-    st.subheader("Partial Match Skills")
-    partial = result.get("partial_match_skills", [])
-    if partial:
-        for skill in partial:
-            st.write(f"~ {skill}")
-    else:
-        st.write("No partial matches identified.")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Strengths")
-        strengths = result.get("strengths", [])
-        if strengths:
-            for item in strengths:
-                st.write(f"✓ {item}")
-        else:
-            st.write("No strengths identified.")
-
-    with col2:
-        st.subheader("Weaknesses")
-        weaknesses = result.get("weaknesses", [])
-        if weaknesses:
-            for item in weaknesses:
-                st.write(f"• {item}")
-        else:
-            st.write("No weaknesses identified.")
-
-    st.subheader("Experience Match")
-    st.write(result.get("experience_match", "Not available."))
-
-    st.subheader("Education Match")
-    st.write(result.get("education_match", "Not available."))
-
-    st.subheader("Project Match")
-    st.write(result.get("project_match", "Not available."))
-
-    st.subheader("Resume Improvement Recommendations")
-    improvements = result.get("resume_improvements", [])
-    if improvements:
-        for index, item in enumerate(improvements, start=1):
-            st.write(f"{index}. {item}")
-    else:
-        st.write("No improvement recommendations available.")
-
-    st.subheader("AI-Generated Interview Questions")
-    questions = result.get("interview_questions", [])
-    if questions:
-        for index, question in enumerate(questions, start=1):
-            st.write(f"{index}. {question}")
-    else:
-        st.write("No interview questions generated.")
-
-    with st.expander("Generate General Resume Improvement Tips"):
-        if st.button("Generate Tips"):
-            with st.spinner("Generating recommendations..."):
-                try:
-                    tips = generate_resume_tips(
-                        st.session_state["resume_text"]
-                    )
-                    st.write(tips)
-                except Exception as e:
-                    st.error(f"Unable to generate tips: {e}")
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
-st.caption("AI Resume Analyzer | Python + Streamlit + Groq")
+    good_g
