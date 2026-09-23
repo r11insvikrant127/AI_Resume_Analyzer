@@ -744,4 +744,116 @@ Good-to-Have Match     : {good_to_have_score}% × 0.10 = {good_contrib}<br>
         st.write("No partial skill matches identified.")
 
     st.markdown("### 🔵 Good-to-Have Gaps")
-    good_g
+    good_gaps = skill_gap.get("good_to_have_gaps", [])
+    if good_gaps:
+        for skill in good_gaps:
+            st.write(f"• {skill}")
+    else:
+        st.write("No good-to-have gaps identified.")
+
+    # --------------------------------------------------------
+    # Required JD skill lists  # CHANGED (renamed labels)
+    # --------------------------------------------------------
+
+    st.subheader("Required JD Skills")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### Matched JD Skills")
+        matched = result.get("matched_skills", [])
+        if matched:
+            for skill in matched:
+                st.write(f"✓ {skill}")
+        else:
+            st.write("No strong matches identified.")
+
+    with col2:
+        st.markdown("#### Missing JD Skills")
+        missing = result.get("missing_skills", [])
+        if missing:
+            for skill in missing:
+                st.write(f"• {skill}")
+        else:
+            st.write("No major missing skills identified.")
+
+    st.markdown("#### Partial / Related Skills")
+    partial = result.get("partial_match_skills", [])
+    if partial:
+        for skill in partial:
+            st.write(f"~ {skill}")
+    else:
+        st.write("No partial matches identified.")
+
+    # --------------------------------------------------------
+    # LLM narrative
+    # --------------------------------------------------------
+
+    st.subheader("Candidate Summary")
+    st.write(
+        result.get("candidate_summary", "No summary available.")
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Strengths")
+        strengths = result.get("strengths", [])
+        if strengths:
+            for item in strengths:
+                st.write(f"✓ {item}")
+        else:
+            st.write("No strengths identified.")
+
+    with col2:
+        st.subheader("Weaknesses")
+        weaknesses = result.get("weaknesses", [])
+        if weaknesses:
+            for item in weaknesses:
+                st.write(f"• {item}")
+        else:
+            st.write("No weaknesses identified.")
+
+    st.subheader("Experience Match")
+    st.write(result.get("experience_match", "Not available."))
+
+    st.subheader("Education Match")
+    st.write(result.get("education_match", "Not available."))
+
+    st.subheader("Project Match")
+    st.write(result.get("project_match", "Not available."))
+
+    st.subheader("Resume Improvement Recommendations")
+    improvements = result.get("resume_improvements", [])
+    if improvements:
+        for index, item in enumerate(improvements, start=1):
+            st.write(f"{index}. {item}")
+    else:
+        st.write("No improvement recommendations available.")
+
+    st.subheader("AI-Generated Interview Questions")
+    questions = result.get("interview_questions", [])
+    if questions:
+        for index, question in enumerate(questions, start=1):
+            st.write(f"{index}. {question}")
+    else:
+        st.write("No interview questions generated.")
+
+    with st.expander("Generate General Resume Improvement Tips"):
+        if st.button("Generate Tips"):
+            with st.spinner("Generating recommendations..."):
+                try:
+                    tips = generate_resume_tips(
+                        st.session_state["resume_text"]
+                    )
+                    st.write(tips)
+                except Exception as e:
+                    st.error(f"Unable to generate tips: {e}")
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
+st.caption("AI Resume Analyzer | Python + Streamlit + Groq")
