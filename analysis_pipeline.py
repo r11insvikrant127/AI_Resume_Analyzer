@@ -15,6 +15,8 @@ from ats_scorer import (
 
 from skill_gap_analyzer import build_skill_gap_analysis
 
+from ats_keyword_analyzer import analyze_ats_keywords
+
 
 def analyze_single_resume(
     uploaded_file,
@@ -28,8 +30,9 @@ def analyze_single_resume(
     Run the full ATS pipeline for one resume against a
     pre-extracted job description requirement set.
 
-    Returns a dict with the same shape app.py already expects,
-    plus 'resume_name' and 'resume_text'.
+    Returns a dict with everything app.py displays, plus:
+        - ats_keyword_analysis   (Feature 1)
+        - resume_name, resume_text
     """
 
     resume_text = extract_resume_text(uploaded_file)
@@ -157,6 +160,13 @@ def analyze_single_resume(
     result["skill_match_percentage"] = technical_skill_percentage
     result["ats_score"] = ats_score
     result["skill_gap"] = skill_gap
+
+    # 7. ATS keyword analysis (Feature 1)
+    result["ats_keyword_analysis"] = analyze_ats_keywords(
+        resume_text=resume_text,
+        required_skills=required_skills,
+        good_to_have_skills=good_to_have_skills,
+    )
 
     result["resume_name"] = getattr(uploaded_file, "name", "resume")
     result["resume_text"] = resume_text

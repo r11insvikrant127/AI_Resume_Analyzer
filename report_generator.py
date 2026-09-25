@@ -17,43 +17,74 @@ from reportlab.platypus import (
 )
 
 
+# ============================================================
+# STYLESHEET (cached, with guarded registration)
+# ============================================================
+
+_STYLES_CACHE = None
+
+
 def _styles():
+    """
+    Build (once) and return the stylesheet used for report
+    generation. Custom styles are registered only if missing.
+    """
+
+    global _STYLES_CACHE
+
+    if _STYLES_CACHE is not None:
+        return _STYLES_CACHE
+
     styles = getSampleStyleSheet()
 
-    styles.add(ParagraphStyle(
-        name="SectionHeader",
-        parent=styles["Heading2"],
+    def _add(name, parent, **kwargs):
+        if name in styles.byName:
+            return
+        styles.add(ParagraphStyle(
+            name=name,
+            parent=styles[parent],
+            **kwargs,
+        ))
+
+    _add(
+        "SectionHeader",
+        "Heading2",
         spaceBefore=14,
         spaceAfter=6,
         textColor=colors.HexColor("#1f3a5f"),
-    ))
+    )
 
-    styles.add(ParagraphStyle(
-        name="SubHeader",
-        parent=styles["Heading3"],
+    _add(
+        "SubHeader",
+        "Heading3",
         spaceBefore=10,
         spaceAfter=4,
         textColor=colors.HexColor("#2c5282"),
-    ))
+    )
 
-    styles.add(ParagraphStyle(
-        name="Body",
-        parent=styles["BodyText"],
+    _add(
+        "Body",
+        "BodyText",
         leading=14,
         spaceAfter=4,
-    ))
+    )
 
-    styles.add(ParagraphStyle(
-        name="Bullet",
-        parent=styles["BodyText"],
+    _add(
+        "Bullet",
+        "BodyText",
         leftIndent=14,
         bulletIndent=4,
         leading=14,
         spaceAfter=2,
-    ))
+    )
 
+    _STYLES_CACHE = styles
     return styles
 
+
+# ============================================================
+# METRIC TABLE
+# ============================================================
 
 def _metric_table(result):
     data = [
@@ -84,6 +115,10 @@ def _metric_table(result):
     return table
 
 
+# ============================================================
+# LIST HELPERS
+# ============================================================
+
 def _bullet_list(items, style):
     flow = []
     if not items:
@@ -104,11 +139,13 @@ def _numbered_list(items, style):
     return flow
 
 
+# ============================================================
+# SINGLE-RESUME REPORT
+# ============================================================
+
 def build_pdf_report(result):
     """
     Build a single-resume PDF report and return it as bytes.
-
-    `result` is the dict produced by analyze_single_resume().
     """
 
     buffer = io.BytesIO()
@@ -131,14 +168,8 @@ def build_pdf_report(result):
     # Header
     # --------------------------------------------------------
 
-    flow.append(Paragraph(
-        "AI Resume Analysis Report",
-        s["Title"],
-    ))
-    flow.append(Paragraph(
-        f"Resume: <b>{resume_name}</b>",
-        s["Body"],
-    ))
+    flow.append(Paragraph("AI Resume Analysis Report", s["Title"]))
+    flow.append(Paragraph(f"Resume: <b>{resume_name}</b>", s["Body"]))
     flow.append(Paragraph(
         f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         s["Body"],
@@ -200,6 +231,48 @@ def build_pdf_report(result):
     ))
 
     # --------------------------------------------------------
+    # ATS keyword analysis (Feature 1)
+    # --------------------------------------------------------
+
+    kw = result.get("ats_keyword_analysis", {}) or {}
+    kw_rows = kw.get("keyword_rows", [])
+
+    if kw_rows:
+
+        flow.append(Paragraph("ATS Keyword Analysis", s["SectionHeader"]))
+
+        flow.append(Paragraph(
+            f"Required Keyword Coverage: "
+            f"{kw.get('required_coverage', 0)}%",
+            s["Body"],
+        ))
+
+        kw_table_data = [["Keyword", "Tier", "Count", "Per 1k"]]
+        for r in kw_rows:
+            kw_table_data.append([
+                r["keyword"],
+                r["tier"],
+                str(r["count"]),
+                str(r["density_per_1000"]),
+            ])
+
+        kw_table = Table(
+            kw_table_data,
+            colWidths=[3 * inch, 1.2 * inch, 0.8 * inch, 1 * inch],
+        )
+        kw_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f3a5f")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+             [colors.white, colors.HexColor("#f0f4f8")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        flow.append(kw_table)
+
+    # --------------------------------------------------------
     # Skill gap
     # --------------------------------------------------------
 
@@ -237,10 +310,17 @@ def build_pdf_report(result):
     return buffer.getvalue()
 
 
+# ============================================================
+# COMPARISON REPORT (with composite ranking — Feature 2)
+# ============================================================
+
 def build_comparison_pdf(results):
     """
     Build a ranked comparison PDF for multiple resumes.
-    Returns bytes.
+
+    `results` may either be already-ranked (containing
+    'rank' and 'composite_score') or unranked; unranked
+    entries are ranked with default weights.
     """
 
     buffer = io.BytesIO()
@@ -257,30 +337,33 @@ def build_comparison_pdf(results):
     s = _styles()
     flow = []
 
-    flow.append(Paragraph(
-        "Resume Comparison Report",
-        s["Title"],
-    ))
+    flow.append(Paragraph("Resume Comparison Report", s["Title"]))
     flow.append(Paragraph(
         f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         s["Body"],
     ))
     flow.append(Spacer(1, 12))
 
-    ranked = sorted(
-        results,
-        key=lambda r: r.get("ats_score", 0),
-        reverse=True,
-    )
+    # --------------------------------------------------------
+    # Ensure ranked
+    # --------------------------------------------------------
+
+    if results and "composite_score" not in results[0]:
+        from candidate_ranker import rank_candidates
+        ranked = rank_candidates(results)
+    else:
+        ranked = results
 
     data = [[
-        "Rank", "Resume", "ATS", "Required", "Technical", "Good-to-Have",
+        "Rank", "Resume", "Composite", "ATS", "Required",
+        "Technical", "Good-to-Have",
     ]]
 
-    for rank, r in enumerate(ranked, start=1):
+    for r in ranked:
         data.append([
-            str(rank),
+            str(r.get("rank", 0)),
             r.get("resume_name", "—"),
+            f"{r.get('composite_score', 0)}%",
             f"{r.get('ats_score', 0)}%",
             f"{r.get('required_match_percentage', 0)}%",
             f"{r.get('technical_skill_percentage', 0)}%",
@@ -289,8 +372,8 @@ def build_comparison_pdf(results):
 
     table = Table(
         data,
-        colWidths=[0.6 * inch, 2.4 * inch, 0.8 * inch,
-                   0.9 * inch, 0.9 * inch, 1.0 * inch],
+        colWidths=[0.5 * inch, 1.9 * inch, 0.9 * inch,
+                   0.7 * inch, 0.8 * inch, 0.8 * inch, 0.9 * inch],
     )
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f3a5f")),
@@ -305,6 +388,20 @@ def build_comparison_pdf(results):
     ]))
 
     flow.append(table)
+
+    # --------------------------------------------------------
+    # Winner callout
+    # --------------------------------------------------------
+
+    if ranked:
+        best = ranked[0]
+        flow.append(Spacer(1, 10))
+        flow.append(Paragraph(
+            f"<b>Best candidate:</b> "
+            f"{best.get('resume_name', '—')} "
+            f"(composite {best.get('composite_score', 0)}%)",
+            s["Body"],
+        ))
 
     doc.build(flow)
 

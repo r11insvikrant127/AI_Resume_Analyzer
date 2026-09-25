@@ -4,3 +4,7 @@ groq
 pypdf
 python-docx
 reportlab
+sqlalchemy
+pymysql
+cryptography
+passlib[bcrypt]
