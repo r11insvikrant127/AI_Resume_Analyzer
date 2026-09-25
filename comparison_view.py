@@ -82,3 +82,20 @@ def render_comparison(results):
         else:
             st.write("None")
         st.write("")
+
+    st.divider()
+
+    from report_generator import build_comparison_pdf
+
+    try:
+        pdf_bytes = build_comparison_pdf(results)
+
+        st.download_button(
+            label="⬇️ Download Comparison PDF",
+            data=pdf_bytes,
+            file_name="resume_comparison_report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    except Exception as e:
+        st.warning(f"Could not generate comparison PDF: {e}")

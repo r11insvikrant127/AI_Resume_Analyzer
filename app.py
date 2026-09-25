@@ -465,6 +465,12 @@ with st.sidebar:
         Resume Improvements
 
         Interview Questions
+
+        Resume Rewriting
+
+        Job Recommendations
+
+        PDF Report Export
         """
     )
 
@@ -629,6 +635,11 @@ if analyze_button:
     st.session_state["results"] = results
     st.session_state["job_description"] = job_description
 
+    # Clear per-resume derived state so a new analysis
+    # does not show a stale rewrite / recommendation set.
+    st.session_state.pop("rewrite", None)
+    st.session_state.pop("recommendations", None)
+
     # --------------------------------------------------------
     # Route: single resume → detailed report
     #        multiple resumes → comparison view
@@ -750,28 +761,28 @@ if "analysis" in st.session_state:
 
     st.markdown(
         f"""
-<div class="formula">
+        <div class="formula">
 
-Required Requirement Match :
-{required_score}% × 0.50 = {req_contribution}
+        Required Requirement Match :
+        {required_score}% × 0.50 = {req_contribution}
 
-<br>
+        <br>
 
-Technical Skill Match :
-{technical_score}% × 0.40 = {technical_contribution}
+        Technical Skill Match :
+        {technical_score}% × 0.40 = {technical_contribution}
 
-<br>
+        <br>
 
-Good-to-Have Match :
-{good_to_have_score}% × 0.10 = {good_to_have_contribution}
+        Good-to-Have Match :
+        {good_to_have_score}% × 0.10 = {good_to_have_contribution}
 
-<hr>
+        <hr>
 
-<b>Final ATS Score = {score}%</b>
+        <b>Final ATS Score = {score}%</b>
 
-</div>
-        """,
-        unsafe_allow_html=True
+        </div>
+                """,
+                unsafe_allow_html=True
     )
 
 
@@ -1271,6 +1282,109 @@ Good-to-Have Match :
             "No good-to-have gaps identified."
         )
 
+    # --------------------------------------------------------
+    # Coverage + priority view
+    # --------------------------------------------------------
+
+    sg = result.get("skill_gap", {}) or {}
+
+    if sg.get("priority_gaps"):
+
+        st.markdown("### 📊 Coverage")
+
+        cv1, cv2, cv3 = st.columns(3)
+
+        with cv1:
+            st.metric(
+                "Required Coverage",
+                f"{sg.get('required_coverage', 0)}%",
+            )
+
+        with cv2:
+            st.metric(
+                "Optional Coverage",
+                f"{sg.get('optional_coverage', 0)}%",
+            )
+
+        with cv3:
+            st.metric(
+                "Severity",
+                sg.get("overall_severity", "low").title(),
+            )
+
+        st.markdown("### 🎯 Prioritized Gap List")
+
+        for gap in sg["priority_gaps"]:
+
+            icon = {
+                "high": "🔴",
+                "medium": "🟡",
+                "low": "🔵",
+            }.get(gap["severity"], "•")
+
+            st.write(
+                f"{icon} **{gap['skill']}** — "
+                f"{gap['type'].replace('_', ' ')} / {gap['status']}"
+            )
+
+
+    # ========================================================
+    # JOB RECOMMENDATIONS
+    # ========================================================
+
+    st.subheader("💼 Job Recommendations")
+
+    if st.button("Recommend Jobs"):
+
+        from job_recommender import recommend_jobs
+
+        with st.spinner("Finding matching roles..."):
+
+            try:
+
+                recommendations = recommend_jobs(
+                    client=client,
+                    model=MODEL,
+                    resume_text=st.session_state["resume_text"],
+                    matched_skills=result.get("matched_skills", []),
+                    missing_skills=result.get("missing_skills", []),
+                    ats_score=result.get("ats_score", 0),
+                )
+
+                st.session_state["recommendations"] = recommendations
+
+            except Exception as e:
+
+                st.error(f"Job recommendation failed: {e}")
+
+    recs = st.session_state.get("recommendations")
+
+    if recs:
+
+        st.markdown("### Best-Fit Roles")
+
+        for r in recs.get("roles", []):
+
+            st.markdown(
+                f"**{r['title']}** "
+                f"({r['level']}, fit {r['fit']}%)"
+            )
+            st.caption(r["reason"])
+
+        if recs.get("search_terms"):
+
+            st.markdown("### Job-Board Search Strings")
+
+            for s in recs["search_terms"]:
+                st.code(s, language="text")
+
+        if recs.get("adjacent_roles"):
+
+            st.markdown("### Adjacent Roles (with Upskilling)")
+
+            for a in recs["adjacent_roles"]:
+                st.write(f"• **{a['title']}** — {a['gap']}")
+
 
     # ========================================================
     # CANDIDATE SUMMARY
@@ -1457,6 +1571,74 @@ Good-to-Have Match :
 
 
     # ========================================================
+    # RESUME REWRITING
+    # ========================================================
+
+    with st.expander("✍️ Rewrite My Resume for This Job"):
+
+        st.caption(
+            "Generates a tailored summary, improved bullet points, "
+            "and a full rewrite. Never invents experience or metrics."
+        )
+
+        if st.button("Generate Rewrite"):
+
+            from resume_rewriter import (
+                rewrite_resume,
+                build_rewrite_pdf_text,
+            )
+
+            with st.spinner("Rewriting resume..."):
+
+                try:
+
+                    rewrite = rewrite_resume(
+                        client=client,
+                        model=MODEL,
+                        resume_text=st.session_state["resume_text"],
+                        job_description=st.session_state["job_description"],
+                    )
+
+                    st.session_state["rewrite"] = rewrite
+
+                except Exception as e:
+
+                    st.error(f"Rewrite failed: {e}")
+
+        rewrite = st.session_state.get("rewrite")
+
+        if rewrite:
+
+            from resume_rewriter import build_rewrite_pdf_text
+
+            st.markdown("### Tailored Summary")
+            st.write(rewrite.get("tailored_summary", ""))
+
+            st.markdown("### Rewritten Bullets")
+            for b in rewrite.get("rewritten_bullets", []):
+                st.write(f"• {b}")
+
+            if rewrite.get("keywords_added"):
+                st.markdown("### JD Keywords Now Surfaced")
+                for k in rewrite["keywords_added"]:
+                    st.write(f"- {k}")
+
+            st.markdown("### Full Rewrite")
+            st.text_area(
+                "Full rewritten resume",
+                value=rewrite.get("full_rewrite", ""),
+                height=300,
+            )
+
+            st.download_button(
+                label="⬇️ Download Rewrite (TXT)",
+                data=build_rewrite_pdf_text(rewrite).encode("utf-8"),
+                file_name="rewritten_resume.txt",
+                mime="text/plain",
+            )
+
+
+    # ========================================================
     # GENERAL RESUME TIPS
     # ========================================================
 
@@ -1490,6 +1672,38 @@ Good-to-Have Match :
                         f"Unable to generate tips: {e}"
                     )
 
+
+# ============================================================
+# DOWNLOAD SINGLE-RESUME PDF REPORT
+# ============================================================
+
+if "analysis" in st.session_state:
+
+    from report_generator import build_pdf_report
+
+    try:
+
+        pdf_bytes = build_pdf_report(
+            st.session_state["analysis"]
+        )
+
+        st.download_button(
+            label="⬇️ Download PDF Report",
+            data=pdf_bytes,
+            file_name=(
+                f"resume_report_"
+                f"{st.session_state['analysis'].get('resume_name', 'resume')}"
+                f".pdf"
+            ),
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+    except Exception as e:
+
+        st.warning(f"Could not generate PDF: {e}")
+
+
 # ============================================================
 # MULTI-RESUME COMPARISON VIEW
 # ============================================================
@@ -1504,7 +1718,7 @@ if (
     render_comparison(
         st.session_state["results"]
     )
-    
+
 # ============================================================
 # FOOTER
 # ============================================================
