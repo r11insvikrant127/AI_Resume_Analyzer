@@ -1,6 +1,10 @@
+#app.py
+
 import os
 import json
 import re
+from analysis_pipeline import analyze_single_resume
+from comparison_view import render_comparison
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -434,7 +438,7 @@ with st.sidebar:
 
         LLM
 
-        PDF Processing
+        PDF & DOCX Processing
 
         Prompt Engineering
         """
@@ -477,9 +481,10 @@ with col1:
         "1. Upload Resume"
     )
 
-    uploaded_file = st.file_uploader(
-        "Upload Resume PDF",
-        type=["pdf"]
+    uploaded_files = st.file_uploader(
+        "Upload Resume(s) — PDF or DOCX",
+        type=["pdf", "docx"],
+        accept_multiple_files=True,
     )
 
 
@@ -519,10 +524,10 @@ if analyze_button:
     # Validate inputs
     # --------------------------------------------------------
 
-    if uploaded_file is None:
+    if not uploaded_files:
 
         st.warning(
-            "Please upload a resume PDF."
+            "Please upload at least one resume (PDF or DOCX)."
         )
 
         st.stop()
@@ -535,430 +540,115 @@ if analyze_button:
 
         st.stop()
 
+    # --------------------------------------------------------
+    # Extract JD requirements ONCE (cached)
+    # --------------------------------------------------------
 
     with st.spinner(
-        "Reading and analyzing resume..."
+        "Extracting job requirements..."
     ):
 
         try:
-
-            # =================================================
-            # 1. EXTRACT RESUME TEXT
-            # =================================================
-
-            resume_text = extract_resume_text(
-                uploaded_file
-            )
-
-            resume_text = clean_resume_text(
-                resume_text
-            )
-
-            if len(resume_text) < 100:
-
-                st.error(
-                    "Very little text was extracted from "
-                    "the PDF. Please upload a text-based PDF."
-                )
-
-                st.stop()
-
-
-            # =================================================
-            # 2. LLM QUALITATIVE ANALYSIS
-            # =================================================
-
-            result = analyze_resume(
-                resume_text,
-                job_description
-            )
-
-
-            # =================================================
-            # 3. EXTRACT STRUCTURED JD REQUIREMENTS
-            # =================================================
 
             requirement_data = get_jd_keywords(
                 job_description
             )
 
-            required_skills = requirement_data.get(
-                "required_skills",
-                []
-            )
-
-            good_to_have_skills = requirement_data.get(
-                "good_to_have_skills",
-                []
-            )
-
-
-            # =================================================
-            # 4. SEMANTIC REQUIREMENT MATCHING
-            # =================================================
-
-            required_matches = compare_requirements_with_resume(
-                client=client,
-                model=MODEL,
-                requirements=required_skills,
-                resume_text=resume_text
-            )
-
-            good_to_have_matches = compare_requirements_with_resume(
-                client=client,
-                model=MODEL,
-                requirements=good_to_have_skills,
-                resume_text=resume_text
-            )
-
-
-            # =================================================
-            # 5. ORGANIZE MATCH RESULTS
-            # =================================================
-
-            det = organize_match_results(
-                required_matches=required_matches,
-                good_to_have_matches=good_to_have_matches
-            )
-
-
-            # =================================================
-            # 6. REQUIREMENT MATCH SCORES
-            # =================================================
-
-            required_match_percentage = (
-                calculate_requirement_match_percentage(
-                    required_matches
-                )
-            )
-
-            good_to_have_match_percentage = (
-                calculate_requirement_match_percentage(
-                    good_to_have_matches
-                )
-            )
-
-
-            # =================================================
-            # 7. TECHNICAL REQUIREMENT MATCHES
-            # =================================================
-            #
-            # Category information comes from the structured
-            # semantic requirement result.
-            #
-            # No hardcoded technology list is used.
-            # =================================================
-
-            technical_matches = [
-                match
-                for match in required_matches
-                if str(
-                    match.get(
-                        "category",
-                        ""
-                    )
-                ).strip().lower() == "technical"
-            ]
-
-
-            # =================================================
-            # 8. TECHNICAL SKILL MATCH
-            # =================================================
-
-            technical_skill_percentage = (
-                calculate_skill_match(
-                    technical_matches
-                )
-            )
-
-
-            # =================================================
-            # 9. TECHNICAL MATCHED / PARTIAL / MISSING
-            # =================================================
-
-            technical_matched = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in technical_matches
-                if match.get(
-                    "status"
-                ) == "matched"
-            ]
-
-            technical_partial = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in technical_matches
-                if match.get(
-                    "status"
-                ) == "partial"
-            ]
-
-            technical_missing = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in technical_matches
-                if match.get(
-                    "status"
-                ) == "missing"
-            ]
-
-
-            # =================================================
-            # 10. NON-TECHNICAL REQUIREMENT MATCHES
-            # =================================================
-
-            required_non_technical_matches = [
-                match
-                for match in required_matches
-                if str(
-                    match.get(
-                        "category",
-                        ""
-                    )
-                ).strip().lower() != "technical"
-            ]
-
-
-            non_technical_matched = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in required_non_technical_matches
-                if match.get(
-                    "status"
-                ) == "matched"
-            ]
-
-            non_technical_partial = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in required_non_technical_matches
-                if match.get(
-                    "status"
-                ) == "partial"
-            ]
-
-            non_technical_missing = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in required_non_technical_matches
-                if match.get(
-                    "status"
-                ) == "missing"
-            ]
-
-
-            # =================================================
-            # 11. SKILL GAP ANALYSIS
-            # =================================================
-
-            skill_gap = build_skill_gap_analysis(
-                matched_required=det[
-                    "matched_required"
-                ],
-                partial_required=det[
-                    "partial_required"
-                ],
-                missing_required=det[
-                    "missing_required"
-                ],
-                matched_good_to_have=det[
-                    "matched_good_to_have"
-                ],
-                partial_good_to_have=det[
-                    "partial_good_to_have"
-                ],
-                missing_good_to_have=det[
-                    "missing_good_to_have"
-                ]
-            )
-
-
-            # =================================================
-            # 12. FINAL ATS SCORE
-            # =================================================
-
-            ats_score = calculate_ats_score(
-                required_match_percentage,
-                technical_skill_percentage,
-                good_to_have_match_percentage
-            )
-
-
-            # =================================================
-            # 13. STORE JD REQUIREMENTS
-            # =================================================
-
-            result["required_skills"] = (
-                required_skills
-            )
-
-            result["good_to_have_skills"] = (
-                good_to_have_skills
-            )
-
-
-            # =================================================
-            # 14. STORE REQUIREMENT MATCH RESULTS
-            # =================================================
-
-            result["matched_required_requirements"] = (
-                det["matched_required"]
-            )
-
-            result["partial_required_requirements"] = (
-                det["partial_required"]
-            )
-
-            result["missing_required_requirements"] = (
-                det["missing_required"]
-            )
-
-            result["matched_good_to_have_requirements"] = (
-                det["matched_good_to_have"]
-            )
-
-            result["partial_good_to_have_requirements"] = (
-                det["partial_good_to_have"]
-            )
-
-            result["missing_good_to_have_requirements"] = (
-                det["missing_good_to_have"]
-            )
-
-
-            # =================================================
-            # 15. STORE REQUIREMENT SCORES
-            # =================================================
-
-            result["required_match_percentage"] = (
-                required_match_percentage
-            )
-
-            result["good_to_have_match_percentage"] = (
-                good_to_have_match_percentage
-            )
-
-
-            # =================================================
-            # 16. STORE TECHNICAL SKILL DATA
-            # =================================================
-
-            result["technical_matched_skills"] = (
-                technical_matched
-            )
-
-            result["technical_partial_skills"] = (
-                technical_partial
-            )
-
-            result["technical_missing_skills"] = (
-                technical_missing
-            )
-
-            result["technical_skill_percentage"] = (
-                technical_skill_percentage
-            )
-
-
-            # =================================================
-            # 17. STORE NON-TECHNICAL DATA
-            # =================================================
-
-            result["required_non_technical_skills"] = [
-                match.get(
-                    "requirement",
-                    ""
-                )
-                for match in required_non_technical_matches
-            ]
-
-            result["non_technical_matched_skills"] = (
-                non_technical_matched
-            )
-
-            result["non_technical_partial_skills"] = (
-                non_technical_partial
-            )
-
-            result["non_technical_missing_skills"] = (
-                non_technical_missing
-            )
-
-
-            # =================================================
-            # 18. STORE GENERAL REQUIRED SKILL DATA
-            # =================================================
-
-            result["matched_skills"] = (
-                det["matched_required"]
-            )
-
-            result["partial_match_skills"] = (
-                det["partial_required"]
-            )
-
-            result["missing_skills"] = (
-                det["missing_required"]
-            )
-
-
-            # =================================================
-            # 19. STORE FINAL RESULTS
-            # =================================================
-
-            result["skill_match_percentage"] = (
-                technical_skill_percentage
-            )
-
-            result["ats_score"] = (
-                ats_score
-            )
-
-            result["skill_gap"] = (
-                skill_gap
-            )
-
-
-            # =================================================
-            # 20. SAVE TO STREAMLIT SESSION
-            # =================================================
-
-            st.session_state["analysis"] = (
-                result
-            )
-
-            st.session_state["resume_text"] = (
-                resume_text
-            )
-
-            st.session_state["job_description"] = (
-                job_description
-            )
-
-
-            st.success(
-                "Resume analysis completed successfully!"
-            )
-
-
         except Exception as e:
 
             st.error(
-                f"Analysis failed: {e}"
+                f"Failed to analyze job description: {e}"
             )
+
+            st.stop()
+
+    # --------------------------------------------------------
+    # Run the pipeline once per resume
+    # --------------------------------------------------------
+
+    results = []
+    errors = []
+
+    progress = st.progress(0.0)
+
+    for index, uploaded_file in enumerate(
+        uploaded_files
+    ):
+
+        try:
+
+            with st.spinner(
+                f"Analyzing {uploaded_file.name}..."
+            ):
+
+                result = analyze_single_resume(
+                    uploaded_file=uploaded_file,
+                    job_description=job_description,
+                    requirement_data=requirement_data,
+                    analyze_resume_llm=analyze_resume,
+                    client=client,
+                    model=MODEL,
+                )
+
+                results.append(result)
+
+        except Exception as e:
+
+            errors.append(
+                (uploaded_file.name, str(e))
+            )
+
+        progress.progress(
+            (index + 1) / len(uploaded_files)
+        )
+
+    progress.empty()
+
+    # --------------------------------------------------------
+    # Surface any per-file errors
+    # --------------------------------------------------------
+
+    for name, message in errors:
+
+        st.warning(
+            f"{name}: {message}"
+        )
+
+    if not results:
+
+        st.error(
+            "No resumes could be analyzed."
+        )
+
+        st.stop()
+
+    # --------------------------------------------------------
+    # Store results in session state
+    # --------------------------------------------------------
+
+    st.session_state["results"] = results
+    st.session_state["job_description"] = job_description
+
+    # --------------------------------------------------------
+    # Route: single resume → detailed report
+    #        multiple resumes → comparison view
+    # --------------------------------------------------------
+
+    if len(results) == 1:
+
+        st.session_state["analysis"] = results[0]
+        st.session_state["resume_text"] = results[0]["resume_text"]
+
+    else:
+
+        # Remove any stale single-resume analysis so the
+        # old detailed-report block below does not render.
+        st.session_state.pop("analysis", None)
+        st.session_state.pop("resume_text", None)
+
+    st.success(
+        f"Analyzed {len(results)} resume(s)."
+    )
 
 
 # ============================================================
@@ -1800,7 +1490,21 @@ Good-to-Have Match :
                         f"Unable to generate tips: {e}"
                     )
 
+# ============================================================
+# MULTI-RESUME COMPARISON VIEW
+# ============================================================
 
+if (
+    "results" in st.session_state
+    and len(st.session_state["results"]) > 1
+):
+
+    st.divider()
+
+    render_comparison(
+        st.session_state["results"]
+    )
+    
 # ============================================================
 # FOOTER
 # ============================================================
