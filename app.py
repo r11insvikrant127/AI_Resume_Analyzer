@@ -13,7 +13,6 @@ from resume_parser import (
 
 from keyword_analyzer import (
     extract_keywords_from_jd,
-    calculate_keyword_match,
     compare_requirements_with_resume,
     organize_match_results
 )
@@ -140,7 +139,7 @@ def analyze_resume(
     """
 
     prompt = f"""
-You are an expert technical recruiter and ATS resume analyzer.
+You are an expert resume analyst.
 
 Analyze the candidate resume against the provided job description.
 
@@ -195,7 +194,7 @@ JOB DESCRIPTION:
             {
                 "role": "system",
                 "content": (
-                    "You are a professional ATS resume analyzer. "
+                    "You are a professional resume analyst. "
                     "Return valid JSON only."
                 )
             },
@@ -266,11 +265,19 @@ def parse_json_response(content):
 
         if start != -1 and end != -1:
 
-            return json.loads(
-                content[
-                    start:end + 1
-                ]
-            )
+            try:
+
+                return json.loads(
+                    content[
+                        start:end + 1
+                    ]
+                )
+
+            except json.JSONDecodeError as exc:
+
+                raise ValueError(
+                    "The AI returned an invalid JSON response."
+                ) from exc
 
         raise ValueError(
             "The AI returned an invalid response. "
@@ -291,14 +298,14 @@ def generate_resume_tips(resume_text):
     """
 
     prompt = f"""
-Review this resume as a professional technical recruiter.
+Review this resume as a professional resume coach.
 
 Provide 8 practical recommendations to improve it.
 
 Focus on:
 
 - ATS compatibility
-- Technical skills
+- Skills presentation
 - Project descriptions
 - Achievement statements
 - Keywords
@@ -355,6 +362,7 @@ Return only a numbered list.
         .choices[0]
         .message
         .content
+        or ""
     )
 
 
@@ -364,19 +372,8 @@ Return only a numbered list.
 
 def get_jd_keywords(job_description):
     """
-    Cache JD skill extraction for the current Streamlit
-    session.
-
-    The returned structure contains:
-
-        required_skills
-        good_to_have_skills
-
-    Each skill contains:
-
-        name
-        category
-        aliases
+    Cache JD requirement extraction for the current
+    Streamlit session.
     """
 
     cache = st.session_state.setdefault(
@@ -390,15 +387,15 @@ def get_jd_keywords(job_description):
 
         return cache[key]
 
-    keyword_data = extract_keywords_from_jd(
+    requirement_data = extract_keywords_from_jd(
         client,
         MODEL,
         job_description
     )
 
-    cache[key] = keyword_data
+    cache[key] = requirement_data
 
-    return keyword_data
+    return requirement_data
 
 
 # ============================================================
@@ -414,11 +411,10 @@ with st.sidebar:
     st.write(
         """
         This application uses Generative AI for semantic
-        job-description analysis and qualitative resume
-        analysis.
+        job-description analysis, resume matching, and
+        qualitative resume analysis.
 
-        Python performs deterministic resume matching
-        and ATS score calculation.
+        Python performs the numerical ATS calculations.
         """
     )
 
@@ -454,7 +450,7 @@ with st.sidebar:
         """
         ATS Score
 
-        Keyword Analysis
+        Requirement Matching
 
         Technical Skill Match
 
@@ -579,63 +575,26 @@ if analyze_button:
 
 
             # =================================================
-            # 3. EXTRACT STRUCTURED JD SKILLS
+            # 3. EXTRACT STRUCTURED JD REQUIREMENTS
             # =================================================
 
-            keyword_data = get_jd_keywords(
+            requirement_data = get_jd_keywords(
                 job_description
             )
 
-            required_skills = keyword_data.get(
+            required_skills = requirement_data.get(
                 "required_skills",
                 []
             )
 
-            good_to_have_skills = keyword_data.get(
+            good_to_have_skills = requirement_data.get(
                 "good_to_have_skills",
                 []
             )
 
 
             # =================================================
-            # 4. LEGACY DISPLAY KEYWORDS
-            # =================================================
-            #
-            # The keyword analyzer still provides these
-            # normalized names for display compatibility.
-            # =================================================
-
-            required_keywords = keyword_data.get(
-                "required_keywords",
-                [
-                    skill.get(
-                        "name",
-                        ""
-                    )
-                    for skill in required_skills
-                ]
-            )
-
-            good_to_have_keywords = keyword_data.get(
-                "good_to_have_keywords",
-                [
-                    skill.get(
-                        "name",
-                        ""
-                    )
-                    for skill in good_to_have_skills
-                ]
-            )
-
-
-            # =================================================
-            # 6. SEMANTIC REQUIREMENT MATCHING
-            # =================================================
-            #
-            # Compare every JD requirement against actual
-            # resume evidence.
-            #
-            # No hardcoded skill relationships are used.
+            # 4. SEMANTIC REQUIREMENT MATCHING
             # =================================================
 
             required_matches = compare_requirements_with_resume(
@@ -652,17 +611,19 @@ if analyze_button:
                 resume_text=resume_text
             )
 
+
+            # =================================================
+            # 5. ORGANIZE MATCH RESULTS
+            # =================================================
+
             det = organize_match_results(
                 required_matches=required_matches,
                 good_to_have_matches=good_to_have_matches
             )
 
+
             # =================================================
-            # 7. SEMANTIC REQUIREMENT SCORES
-            # =================================================
-            #
-            # These percentages are based on semantic evidence
-            # rather than exact keyword presence.
+            # 6. REQUIREMENT MATCH SCORES
             # =================================================
 
             required_match_percentage = (
@@ -676,154 +637,131 @@ if analyze_button:
                     good_to_have_matches
                 )
             )
-            # =================================================
-            # 7. BUILD CATEGORY LOOKUP
-            # =================================================
-            #
-            # Groq has already determined whether each skill
-            # is technical, soft-skill, or foundational.
-            #
-            # Python does NOT maintain a hardcoded skill list.
-            # =================================================
-
-            required_category_map = {}
-
-            for skill in required_skills:
-
-                name = str(
-                    skill.get(
-                        "name",
-                        ""
-                    )
-                ).strip().lower()
-
-                category = str(
-                    skill.get(
-                        "category",
-                        ""
-                    )
-                ).strip().lower()
-
-                if name:
-
-                    required_category_map[
-                        name
-                    ] = category
 
 
             # =================================================
-            # 8. SEPARATE REQUIRED TECHNICAL SKILLS
-            # =================================================
-
-            required_technical = [
-                skill_name
-                for skill_name in (
-                    det["matched_required"]
-                    + det["partial_required"]
-                    + det["missing_required"]
-                )
-                if required_category_map.get(
-                    skill_name,
-                    ""
-                ) == "technical"
-            ]
-
-
-            # =================================================
-            # 9. REQUIRED NON-TECHNICAL SKILLS
-            # =================================================
-
-            required_non_technical = [
-                skill_name
-                for skill_name in (
-                    det["matched_required"]
-                    + det["partial_required"]
-                    + det["missing_required"]
-                )
-                if required_category_map.get(
-                    skill_name,
-                    ""
-                ) != "technical"
-            ]
-
-
-            # =================================================
-            # 10. HELPER FOR TECHNICAL SUBSETS
-            # =================================================
-
-            def subset(
-                skills,
-                allowed_skills
-            ):
-                """
-                Keep only skills classified as technical
-                by Groq.
-                """
-
-                allowed = set(
-                    allowed_skills
-                )
-
-                return [
-                    skill
-                    for skill in skills
-                    if skill in allowed
-                ]
-
-
-            # =================================================
-            # 11. TECHNICAL REQUIREMENT MATCHES
+            # 7. TECHNICAL REQUIREMENT MATCHES
             # =================================================
             #
-            # Keep the complete semantic match objects so that
-            # match_strength is preserved.
+            # Category information comes from the structured
+            # semantic requirement result.
+            #
+            # No hardcoded technology list is used.
             # =================================================
 
             technical_matches = [
                 match
                 for match in required_matches
-                if match.get("category") == "technical"
+                if str(
+                    match.get(
+                        "category",
+                        ""
+                    )
+                ).strip().lower() == "technical"
             ]
 
 
             # =================================================
-            # 12. TECHNICAL SKILL MATCH
-            # =================================================
-            #
-            # The scorer uses the semantic match_strength returned
-            # by the requirement matcher.
+            # 8. TECHNICAL SKILL MATCH
             # =================================================
 
-            technical_skill_percentage = calculate_skill_match(
-                technical_matches
+            technical_skill_percentage = (
+                calculate_skill_match(
+                    technical_matches
+                )
             )
 
 
             # =================================================
-            # 13. TECHNICAL MATCHED / PARTIAL / MISSING
+            # 9. TECHNICAL MATCHED / PARTIAL / MISSING
             # =================================================
 
             technical_matched = [
-                match["requirement"]
+                match.get(
+                    "requirement",
+                    ""
+                )
                 for match in technical_matches
-                if match.get("status") == "matched"
+                if match.get(
+                    "status"
+                ) == "matched"
             ]
 
             technical_partial = [
-                match["requirement"]
+                match.get(
+                    "requirement",
+                    ""
+                )
                 for match in technical_matches
-                if match.get("status") == "partial"
+                if match.get(
+                    "status"
+                ) == "partial"
             ]
 
             technical_missing = [
-                match["requirement"]
+                match.get(
+                    "requirement",
+                    ""
+                )
                 for match in technical_matches
-                if match.get("status") == "missing"
+                if match.get(
+                    "status"
+                ) == "missing"
             ]
 
 
             # =================================================
-            # 13. SKILL GAP ANALYSIS
+            # 10. NON-TECHNICAL REQUIREMENT MATCHES
+            # =================================================
+
+            required_non_technical_matches = [
+                match
+                for match in required_matches
+                if str(
+                    match.get(
+                        "category",
+                        ""
+                    )
+                ).strip().lower() != "technical"
+            ]
+
+
+            non_technical_matched = [
+                match.get(
+                    "requirement",
+                    ""
+                )
+                for match in required_non_technical_matches
+                if match.get(
+                    "status"
+                ) == "matched"
+            ]
+
+            non_technical_partial = [
+                match.get(
+                    "requirement",
+                    ""
+                )
+                for match in required_non_technical_matches
+                if match.get(
+                    "status"
+                ) == "partial"
+            ]
+
+            non_technical_missing = [
+                match.get(
+                    "requirement",
+                    ""
+                )
+                for match in required_non_technical_matches
+                if match.get(
+                    "status"
+                ) == "missing"
+            ]
+
+
+            # =================================================
+            # 11. SKILL GAP ANALYSIS
             # =================================================
 
             skill_gap = build_skill_gap_analysis(
@@ -849,7 +787,7 @@ if analyze_button:
 
 
             # =================================================
-            # FINAL ATS SCORE
+            # 12. FINAL ATS SCORE
             # =================================================
 
             ats_score = calculate_ats_score(
@@ -857,80 +795,10 @@ if analyze_button:
                 technical_skill_percentage,
                 good_to_have_match_percentage
             )
-            st.write("========== DEBUG SCORE ==========")
-
-            st.write(
-                "Required Keyword Match:",
-                keyword_analysis["required_percentage"]
-            )
-
-            st.write(
-                "Technical Skill Match:",
-                technical_skill_percentage
-            )
-
-            st.write(
-                "Good-to-Have Match:",
-                keyword_analysis["good_to_have_percentage"]
-            )
-
-            st.write(
-                "Matched Required:",
-                det["matched_required"]
-            )
-
-            st.write(
-                "Partial Required:",
-                det["partial_required"]
-            )
-
-            st.write(
-                "Missing Required:",
-                det["missing_required"]
-            )
-
-            st.write(
-                "Matched Good-to-Have:",
-                det["matched_good_to_have"]
-            )
-
-            st.write(
-                "Partial Good-to-Have:",
-                det["partial_good_to_have"]
-            )
-
-            st.write(
-                "Missing Good-to-Have:",
-                det["missing_good_to_have"]
-            )
-
-            st.write(
-                "Technical Matched:",
-                technical_matched
-            )
-
-            st.write(
-                "Technical Partial:",
-                technical_partial
-            )
-
-            st.write(
-                "Technical Missing:",
-                technical_missing
-            )
-
-            st.write(
-                "FINAL ATS:",
-                ats_score
-            )
-
-            st.write(
-                "================================"
-            )
 
 
             # =================================================
-            # 15. STORE JD DATA
+            # 13. STORE JD REQUIREMENTS
             # =================================================
 
             result["required_skills"] = (
@@ -941,63 +809,51 @@ if analyze_button:
                 good_to_have_skills
             )
 
-            result["required_keywords"] = (
-                required_keywords
+
+            # =================================================
+            # 14. STORE REQUIREMENT MATCH RESULTS
+            # =================================================
+
+            result["matched_required_requirements"] = (
+                det["matched_required"]
             )
 
-            result["good_to_have_keywords"] = (
-                good_to_have_keywords
+            result["partial_required_requirements"] = (
+                det["partial_required"]
+            )
+
+            result["missing_required_requirements"] = (
+                det["missing_required"]
+            )
+
+            result["matched_good_to_have_requirements"] = (
+                det["matched_good_to_have"]
+            )
+
+            result["partial_good_to_have_requirements"] = (
+                det["partial_good_to_have"]
+            )
+
+            result["missing_good_to_have_requirements"] = (
+                det["missing_good_to_have"]
             )
 
 
             # =================================================
-            # 16. STORE KEYWORD MATCH RESULTS
+            # 15. STORE REQUIREMENT SCORES
             # =================================================
 
-            result["matched_required_keywords"] = (
-                keyword_analysis[
-                    "matched_required"
-                ]
-            )
-
-            result["missing_required_keywords"] = (
-                keyword_analysis[
-                    "missing_required"
-                ]
-            )
-
-            result["matched_good_to_have_keywords"] = (
-                keyword_analysis[
-                    "matched_good_to_have"
-                ]
-            )
-
-            result["missing_good_to_have_keywords"] = (
-                keyword_analysis[
-                    "missing_good_to_have"
-                ]
-            )
-
-            result["required_keyword_percentage"] = (
+            result["required_match_percentage"] = (
                 required_match_percentage
             )
 
-            result["good_to_have_percentage"] = (
+            result["good_to_have_match_percentage"] = (
                 good_to_have_match_percentage
-            )
-
-            result["keyword_match_percentage"] = (
-                round(
-                    (
-                        required_match_percentage
-                        + good_to_have_match_percentage
-                    ) / 2
-                )
             )
 
 
             # =================================================
-            # 17. STORE TECHNICAL SKILL DATA
+            # 16. STORE TECHNICAL SKILL DATA
             # =================================================
 
             result["technical_matched_skills"] = (
@@ -1018,7 +874,32 @@ if analyze_button:
 
 
             # =================================================
-            # 18. STORE ALL REQUIRED SKILL DATA
+            # 17. STORE NON-TECHNICAL DATA
+            # =================================================
+
+            result["required_non_technical_skills"] = [
+                match.get(
+                    "requirement",
+                    ""
+                )
+                for match in required_non_technical_matches
+            ]
+
+            result["non_technical_matched_skills"] = (
+                non_technical_matched
+            )
+
+            result["non_technical_partial_skills"] = (
+                non_technical_partial
+            )
+
+            result["non_technical_missing_skills"] = (
+                non_technical_missing
+            )
+
+
+            # =================================================
+            # 18. STORE GENERAL REQUIRED SKILL DATA
             # =================================================
 
             result["matched_skills"] = (
@@ -1035,20 +916,7 @@ if analyze_button:
 
 
             # =================================================
-            # 19. STORE CATEGORY DATA
-            # =================================================
-
-            result["required_technical_skills"] = (
-                required_technical
-            )
-
-            result["required_non_technical_skills"] = (
-                required_non_technical
-            )
-
-
-            # =================================================
-            # 20. STORE FINAL RESULTS
+            # 19. STORE FINAL RESULTS
             # =================================================
 
             result["skill_match_percentage"] = (
@@ -1065,10 +933,12 @@ if analyze_button:
 
 
             # =================================================
-            # 21. SAVE TO STREAMLIT SESSION
+            # 20. SAVE TO STREAMLIT SESSION
             # =================================================
 
-            st.session_state["analysis"] = result
+            st.session_state["analysis"] = (
+                result
+            )
 
             st.session_state["resume_text"] = (
                 resume_text
@@ -1118,7 +988,7 @@ if "analysis" in st.session_state:
     )
 
     required_score = result.get(
-        "required_keyword_percentage",
+        "required_match_percentage",
         0
     )
 
@@ -1128,7 +998,7 @@ if "analysis" in st.session_state:
     )
 
     good_to_have_score = result.get(
-        "good_to_have_percentage",
+        "good_to_have_match_percentage",
         0
     )
 
@@ -1145,7 +1015,7 @@ if "analysis" in st.session_state:
     with c2:
 
         st.metric(
-            "Required Keyword Match",
+            "Required Requirement Match",
             f"{required_score}%"
         )
 
@@ -1192,7 +1062,7 @@ if "analysis" in st.session_state:
         f"""
 <div class="formula">
 
-Required Keyword Match :
+Required Requirement Match :
 {required_score}% × 0.50 = {req_contribution}
 
 <br>
@@ -1216,51 +1086,53 @@ Good-to-Have Match :
 
 
     # ========================================================
-    # ATS KEYWORD ANALYSIS
+    # REQUIREMENT ANALYSIS
     # ========================================================
 
     st.subheader(
-        "ATS Keyword Analysis"
+        "Job Requirement Analysis"
     )
 
-    overall_keyword_score = result.get(
-        "keyword_match_percentage",
-        0
-    )
+    r1, r2, r3 = st.columns(3)
 
-    k1, k2, k3 = st.columns(3)
-
-    with k1:
+    with r1:
 
         st.metric(
-            "Required Keyword Match",
+            "Required Match",
             f"{required_score}%"
         )
 
-    with k2:
+    with r2:
 
         st.metric(
             "Good-to-Have Match",
             f"{good_to_have_score}%"
         )
 
-    with k3:
+    with r3:
+
+        overall_requirement_score = round(
+            (
+                required_score
+                + good_to_have_score
+            ) / 2
+        )
 
         st.metric(
-            "Overall Keyword Match",
-            f"{overall_keyword_score}%"
+            "Overall Requirement Match",
+            f"{overall_requirement_score}%"
         )
 
 
     # ========================================================
-    # REQUIRED KEYWORDS
+    # REQUIRED REQUIREMENTS
     # ========================================================
 
     st.markdown(
-        "### Required Keywords"
+        "### Required Requirements"
     )
 
-    rc1, rc2 = st.columns(2)
+    rc1, rc2, rc3 = st.columns(3)
 
     with rc1:
 
@@ -1269,60 +1141,86 @@ Good-to-Have Match :
         )
 
         matched_required = result.get(
-            "matched_required_keywords",
+            "matched_required_requirements",
             []
         )
 
         if matched_required:
 
-            for keyword in matched_required:
+            for requirement in matched_required:
 
                 st.write(
-                    f"✓ {keyword}"
+                    f"✓ {requirement}"
                 )
 
         else:
 
             st.write(
-                "No required keywords matched."
+                "No required requirements matched."
             )
 
 
     with rc2:
 
         st.markdown(
-            "#### Missing"
+            "#### Partial"
         )
 
-        missing_required = result.get(
-            "missing_required_keywords",
+        partial_required = result.get(
+            "partial_required_requirements",
             []
         )
 
-        if missing_required:
+        if partial_required:
 
-            for keyword in missing_required:
+            for requirement in partial_required:
 
                 st.write(
-                    f"• {keyword}"
+                    f"~ {requirement}"
                 )
 
         else:
 
             st.write(
-                "No required keywords are missing."
+                "No partial required matches."
+            )
+
+
+    with rc3:
+
+        st.markdown(
+            "#### Missing"
+        )
+
+        missing_required = result.get(
+            "missing_required_requirements",
+            []
+        )
+
+        if missing_required:
+
+            for requirement in missing_required:
+
+                st.write(
+                    f"• {requirement}"
+                )
+
+        else:
+
+            st.write(
+                "No required requirements are missing."
             )
 
 
     # ========================================================
-    # GOOD-TO-HAVE KEYWORDS
+    # GOOD-TO-HAVE REQUIREMENTS
     # ========================================================
 
     st.markdown(
-        "### Good-to-Have Keywords"
+        "### Good-to-Have Requirements"
     )
 
-    gc1, gc2 = st.columns(2)
+    gc1, gc2, gc3 = st.columns(3)
 
     with gc1:
 
@@ -1331,48 +1229,74 @@ Good-to-Have Match :
         )
 
         matched_good = result.get(
-            "matched_good_to_have_keywords",
+            "matched_good_to_have_requirements",
             []
         )
 
         if matched_good:
 
-            for keyword in matched_good:
+            for requirement in matched_good:
 
                 st.write(
-                    f"✓ {keyword}"
+                    f"✓ {requirement}"
                 )
 
         else:
 
             st.write(
-                "No good-to-have keywords matched."
+                "No good-to-have requirements matched."
             )
 
 
     with gc2:
 
         st.markdown(
-            "#### Missing"
+            "#### Partial"
         )
 
-        missing_good = result.get(
-            "missing_good_to_have_keywords",
+        partial_good = result.get(
+            "partial_good_to_have_requirements",
             []
         )
 
-        if missing_good:
+        if partial_good:
 
-            for keyword in missing_good:
+            for requirement in partial_good:
 
                 st.write(
-                    f"• {keyword}"
+                    f"~ {requirement}"
                 )
 
         else:
 
             st.write(
-                "No good-to-have keywords are missing."
+                "No partial good-to-have matches."
+            )
+
+
+    with gc3:
+
+        st.markdown(
+            "#### Missing"
+        )
+
+        missing_good = result.get(
+            "missing_good_to_have_requirements",
+            []
+        )
+
+        if missing_good:
+
+            for requirement in missing_good:
+
+                st.write(
+                    f"• {requirement}"
+                )
+
+        else:
+
+            st.write(
+                "No good-to-have requirements are missing."
             )
 
 
@@ -1385,11 +1309,10 @@ Good-to-Have Match :
     )
 
     st.caption(
-        "This component considers REQUIRED technical "
-        "skills only. Skill categories are determined "
-        "from the job description."
+        "This component considers required technical "
+        "skills only. Categories are determined from "
+        "the job description."
     )
-
 
     technical_matched = result.get(
         "technical_matched_skills",
@@ -1406,13 +1329,11 @@ Good-to-Have Match :
         []
     )
 
-
     total_technical_skills = (
         len(technical_matched)
         + len(technical_partial)
         + len(technical_missing)
     )
-
 
     t1, t2 = st.columns(2)
 
@@ -1518,20 +1439,38 @@ Good-to-Have Match :
         []
     )
 
+    non_technical_matched = result.get(
+        "non_technical_matched_skills",
+        []
+    )
+
+    non_technical_partial = result.get(
+        "non_technical_partial_skills",
+        []
+    )
+
+    non_technical_missing = result.get(
+        "non_technical_missing_skills",
+        []
+    )
+
     if required_non_technical:
 
         for skill in required_non_technical:
 
-            if skill in result.get(
-                "matched_skills",
-                []
-            ):
+            if skill in non_technical_matched:
 
                 st.write(
                     f"✓ {skill}"
                 )
 
-            else:
+            elif skill in non_technical_partial:
+
+                st.write(
+                    f"~ {skill}"
+                )
+
+            elif skill in non_technical_missing:
 
                 st.write(
                     f"• {skill}"
@@ -1592,7 +1531,7 @@ Good-to-Have Match :
     # --------------------------------------------------------
 
     st.markdown(
-        "### 🟡 Partial / Related Skills"
+        "### 🟡 Partial Required Skills"
     )
 
     partial_gaps = skill_gap.get(
@@ -1640,99 +1579,6 @@ Good-to-Have Match :
 
         st.write(
             "No good-to-have gaps identified."
-        )
-
-
-    # ========================================================
-    # REQUIRED JD SKILLS
-    # ========================================================
-
-    st.subheader(
-        "Required JD Skills"
-    )
-
-
-    # --------------------------------------------------------
-    # Matched required
-    # --------------------------------------------------------
-
-    st.markdown(
-        "#### Matched Required Skills"
-    )
-
-    matched_required_skills = result.get(
-        "matched_skills",
-        []
-    )
-
-    if matched_required_skills:
-
-        for skill in matched_required_skills:
-
-            st.write(
-                f"✓ {skill}"
-            )
-
-    else:
-
-        st.write(
-            "No required skills matched."
-        )
-
-
-    # --------------------------------------------------------
-    # Partial required
-    # --------------------------------------------------------
-
-    st.markdown(
-        "#### Partial / Related Required Skills"
-    )
-
-    partial_required_skills = result.get(
-        "partial_match_skills",
-        []
-    )
-
-    if partial_required_skills:
-
-        for skill in partial_required_skills:
-
-            st.write(
-                f"~ {skill}"
-            )
-
-    else:
-
-        st.write(
-            "No partial required skills identified."
-        )
-
-
-    # --------------------------------------------------------
-    # Missing required
-    # --------------------------------------------------------
-
-    st.markdown(
-        "#### Missing Required Skills"
-    )
-
-    missing_required_skills = result.get(
-        "missing_skills",
-        []
-    )
-
-    if missing_required_skills:
-
-        for skill in missing_required_skills:
-
-            st.write(
-                f"• {skill}"
-            )
-
-    else:
-
-        st.write(
-            "No required skills are missing."
         )
 
 

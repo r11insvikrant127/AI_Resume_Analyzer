@@ -381,7 +381,6 @@ def split_technical_skills(skills):
 # ============================================================
 # SEMANTIC REQUIREMENT MATCHING
 # ============================================================
-
 def compare_requirements_with_resume(
     client,
     model,
@@ -389,16 +388,13 @@ def compare_requirements_with_resume(
     resume_text
 ):
     """
-    Compare JD requirements against the actual resume.
+    Compare JD requirements against explicit evidence in
+    the candidate's resume.
 
-    The LLM determines whether the resume contains:
-        matched
-        partial
-        missing
+    The LLM performs semantic interpretation, but it must
+    ground every classification in actual resume evidence.
 
-    It also returns a match strength between 0 and 1.
-
-    Python does NOT contain any hardcoded skill relationships.
+    No hardcoded skill or technology relationships are used.
     """
 
     if not requirements:
@@ -412,7 +408,10 @@ def compare_requirements_with_resume(
             continue
 
         name = normalize_skill(
-            requirement.get("name", "")
+            requirement.get(
+                "name",
+                ""
+            )
         )
 
         category = get_skill_category(
@@ -431,121 +430,196 @@ def compare_requirements_with_resume(
         return []
 
     prompt = f"""
-You are a resume-to-job-requirement matching system.
+You are a strict resume-to-job-requirement matching system.
 
-Your task is to compare the requirements extracted from a
-job description against the candidate's resume.
+Your task is to determine whether the candidate's resume
+provides evidence for each job requirement.
 
-The goal is to determine whether the resume provides evidence
-that the candidate satisfies each requirement.
+The most important rule is:
 
-IMPORTANT:
+ONLY USE INFORMATION THAT IS ACTUALLY PRESENT IN THE RESUME.
 
-Do NOT rely only on exact keyword matching.
-
-A resume may demonstrate a requirement using:
-- different wording
-- an abbreviation
-- a standard equivalent expression
-- project experience
-- work experience
-- internship experience
-- education
-- certifications
-- explicitly described practical experience
-
-However, do NOT assume that two merely related technologies
-are equivalent.
-
-For example, being familiar with one technology does not
-automatically prove experience with another technology.
-
-Use the actual evidence present in the resume.
+Do not infer, assume, extrapolate, or invent candidate
+experience.
 
 ------------------------------------------------------------
 MATCH STATUS
 ------------------------------------------------------------
 
-For every requirement return exactly one:
+For every requirement return exactly one of:
 
 "matched"
 
-The resume contains clear and sufficient evidence that the
-candidate has the requirement.
+Use matched ONLY when the resume contains explicit evidence
+that the candidate has the requirement.
 
 "partial"
 
-The resume contains relevant evidence, but the evidence is
-incomplete, indirect, limited, or does not fully demonstrate
-the requirement.
+Use partial ONLY when the resume contains explicit,
+relevant evidence related to the requirement, but that
+evidence clearly does not fully satisfy the requirement.
 
 "missing"
 
-The resume does not provide meaningful evidence for the
-requirement.
+Use missing when the resume does not contain explicit
+evidence for the requirement.
+
+------------------------------------------------------------
+STRICT EVIDENCE RULE
+------------------------------------------------------------
+
+The following do NOT count as evidence:
+
+- assumptions
+- implications
+- inferred experience
+- likely knowledge from a degree
+- likely knowledge from a job title
+- likely knowledge from another technology
+- likely knowledge from another course
+- generic claims about the candidate
+- what a candidate would normally know
+- what someone in a particular role would normally use
+
+For example:
+
+If the resume says:
+
+"System administrator"
+
+you MUST NOT conclude:
+
+"Git experience"
+
+unless Git or actual version-control experience is
+explicitly mentioned.
+
+If the resume says:
+
+"Python"
+
+you MUST NOT conclude:
+
+"FastAPI"
+
+unless FastAPI or explicit API/framework experience is
+actually present.
+
+If the resume says:
+
+"B.Tech in Computer Science"
+
+you MUST NOT automatically conclude that every individual
+computer-science topic is satisfied.
+
+------------------------------------------------------------
+PARTIAL MATCH RULE
+------------------------------------------------------------
+
+Partial does NOT mean:
+
+"the candidate probably knows it."
+
+Partial means:
+
+"The resume explicitly demonstrates something relevant,
+but it does not fully demonstrate the requested requirement."
+
+Example:
+
+Requirement:
+"REST API development"
+
+Resume:
+"Developed HTTP-based backend services"
+
+This may be partial if the evidence is explicit but does
+not establish complete REST API experience.
+
+However:
+
+Resume:
+"Worked with Java"
+
+Requirement:
+"REST API development"
+
+This is missing, NOT partial.
 
 ------------------------------------------------------------
 MATCH STRENGTH
 ------------------------------------------------------------
 
-Return a number from 0.0 to 1.0.
-
-Use:
+Return:
 
 1.0
 Clear and direct evidence.
 
 0.5
-Meaningful but incomplete or indirect evidence.
+Explicit but incomplete evidence.
 
 0.0
-No meaningful evidence.
+No explicit evidence.
 
-You may use values between these when appropriate, but
-do not use arbitrary values merely to inflate the score.
+Values between these may be used only when the evidence
+clearly justifies them.
+
+Do NOT use match_strength to compensate for missing evidence.
 
 ------------------------------------------------------------
 EVIDENCE
 ------------------------------------------------------------
 
-For each requirement, identify the relevant evidence from
-the resume.
+For every matched or partial requirement, quote or closely
+paraphrase the relevant resume evidence.
 
-Do NOT invent evidence.
+The evidence MUST come from the supplied resume.
 
-If no evidence exists, return an empty string.
+For missing requirements:
 
-Keep the evidence concise.
+"evidence": ""
+
+Do NOT fabricate evidence.
 
 ------------------------------------------------------------
 REASON
 ------------------------------------------------------------
 
-Briefly explain why the evidence satisfies, partially
-satisfies, or fails to satisfy the requirement.
+Explain the classification briefly.
 
-The explanation must be based only on the resume.
+The reason must describe the actual relationship between
+the resume evidence and the requirement.
+
+Do not use phrases such as:
+
+- "probably"
+- "likely"
+- "implied"
+- "presumably"
+- "appears to know"
+- "should have"
+- "would normally have"
+
+unless those words are directly present in the resume.
 
 ------------------------------------------------------------
-IMPORTANT GENERALIZATION RULE
+NO PREDEFINED TECHNOLOGY RELATIONSHIPS
 ------------------------------------------------------------
 
 Do not use a predefined technology relationship list.
 
-Do not assume relationships such as:
+Do not assume that related technologies are equivalent.
 
-technology A -> technology B
-
-unless the actual resume evidence supports the requirement.
-
-Judge each requirement independently from the supplied
-resume.
+Evaluate every requirement independently.
 
 ------------------------------------------------------------
 REQUIREMENTS
 ------------------------------------------------------------
 
-{json.dumps(requirement_payload, indent=2)}
+{json.dumps(
+    requirement_payload,
+    indent=2
+)}
 
 ------------------------------------------------------------
 RESUME
@@ -559,7 +633,7 @@ OUTPUT
 
 Return ONLY valid JSON.
 
-Use exactly this structure:
+Use exactly:
 
 {{
     "matches": [
@@ -568,8 +642,8 @@ Use exactly this structure:
             "category": "technical",
             "status": "matched",
             "match_strength": 1.0,
-            "evidence": "Relevant evidence from resume",
-            "reason": "Why this evidence satisfies the requirement"
+            "evidence": "Explicit evidence from the resume",
+            "reason": "Explanation based only on that evidence"
         }}
     ]
 }}
@@ -581,10 +655,11 @@ Use exactly this structure:
             {
                 "role": "system",
                 "content": (
-                    "You are a resume requirement matching "
-                    "system. Compare requirements against "
-                    "resume evidence objectively. Never "
-                    "invent evidence. Return valid JSON only."
+                    "You are a strict evidence-based resume "
+                    "matching system. Never infer candidate "
+                    "experience that is not explicitly supported "
+                    "by the resume. Never invent evidence. "
+                    "Return valid JSON only."
                 )
             },
             {
@@ -598,7 +673,8 @@ Use exactly this structure:
     content = (
         response
         .choices[0]
-        .message.content
+        .message
+        .content
         or ""
     ).strip()
 
@@ -625,7 +701,9 @@ Use exactly this structure:
 
     try:
 
-        data = json.loads(content)
+        data = json.loads(
+            content
+        )
 
     except json.JSONDecodeError:
 
@@ -642,7 +720,9 @@ Use exactly this structure:
         try:
 
             data = json.loads(
-                content[start:end + 1]
+                content[
+                    start:end + 1
+                ]
             )
 
         except json.JSONDecodeError as exc:
@@ -667,7 +747,7 @@ Use exactly this structure:
         matches = []
 
     # ========================================================
-    # VALIDATE AND NORMALIZE RESULTS
+    # VALIDATE RESULTS
     # ========================================================
 
     valid_statuses = {
@@ -732,6 +812,24 @@ Use exactly this structure:
         if status not in valid_statuses:
             status = "missing"
 
+        # ----------------------------------------------------
+        # Evidence validation
+        # ----------------------------------------------------
+
+        if status in {
+            "matched",
+            "partial"
+        } and not evidence:
+
+            status = "missing"
+            reason = (
+                "No explicit resume evidence was provided."
+            )
+
+        # ----------------------------------------------------
+        # Match strength
+        # ----------------------------------------------------
+
         try:
 
             match_strength = float(
@@ -748,8 +846,6 @@ Use exactly this structure:
 
             match_strength = 0.0
 
-        # Keep strength inside the valid range.
-
         match_strength = max(
             0.0,
             min(
@@ -758,20 +854,21 @@ Use exactly this structure:
             )
         )
 
-        # Keep status and strength logically consistent.
+        # ----------------------------------------------------
+        # Keep status and strength consistent
+        # ----------------------------------------------------
 
         if status == "matched":
+
             match_strength = max(
                 match_strength,
                 0.75
             )
 
-        elif status == "missing":
-            match_strength = 0.0
-
         elif status == "partial":
 
-            if match_strength <= 0.0:
+            if match_strength <= 0:
+
                 match_strength = 0.5
 
             match_strength = min(
@@ -779,19 +876,38 @@ Use exactly this structure:
                 0.74
             )
 
+        elif status == "missing":
+
+            match_strength = 0.0
+            evidence = ""
+
         normalized_matches.append({
-            "requirement": requirement,
-            "category": category,
-            "status": status,
-            "match_strength": round(
-                match_strength,
-                3
-            ),
-            "evidence": evidence,
-            "reason": reason
+
+            "requirement":
+                requirement,
+
+            "category":
+                category,
+
+            "status":
+                status,
+
+            "match_strength":
+                round(
+                    match_strength,
+                    3
+                ),
+
+            "evidence":
+                evidence,
+
+            "reason":
+                reason
         })
 
-        seen.add(requirement)
+        seen.add(
+            requirement
+        )
 
     # ========================================================
     # ENSURE EVERY REQUIREMENT HAS A RESULT
@@ -810,15 +926,24 @@ Use exactly this structure:
             continue
 
         normalized_matches.append({
-            "requirement": name,
-            "category": requirement["category"],
-            "status": "missing",
-            "match_strength": 0.0,
-            "evidence": "",
-            "reason": (
-                "No matching evidence was returned from "
-                "the resume."
-            )
+
+            "requirement":
+                name,
+
+            "category":
+                requirement["category"],
+
+            "status":
+                "missing",
+
+            "match_strength":
+                0.0,
+
+            "evidence":
+                "",
+
+            "reason":
+                "No explicit evidence was found in the resume."
         })
 
     return normalized_matches
@@ -915,7 +1040,7 @@ def organize_match_results(
             + missing_good_to_have
     }
 
-    
+
 # ============================================================
 # KEYWORD MATCH PERCENTAGES
 # ============================================================
