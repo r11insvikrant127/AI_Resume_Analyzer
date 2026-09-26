@@ -31,8 +31,8 @@ from styles import (
 
 load_dotenv()
 
-from db import init_db
-init_db()
+from db import init_db_cached
+init_db_cached()
 
 API_KEY = os.getenv("GROQ_API_KEY")
 
@@ -40,7 +40,11 @@ if not API_KEY:
     st.error("GROQ_API_KEY is missing. Add it to your .env file.")
     st.stop()
 
-client = Groq(api_key=API_KEY)
+@st.cache_resource(show_spinner=False)
+def _make_client(key):
+    return Groq(api_key=key)
+
+client = _make_client(API_KEY)
 MODEL = "openai/gpt-oss-120b"
 
 
@@ -53,7 +57,8 @@ st.set_page_config(
     page_icon="📄",
     layout="wide",
 )
-
+from styles import loading_bar
+bar = loading_bar()
 # Inject theme BEFORE the auth gate so the login page is styled
 inject_theme()
 
@@ -71,7 +76,7 @@ render_logout_button()
 # ============================================================
 # HERO
 # ============================================================
-
+bar.empty()
 hero(
     title="AI Resume Analyzer & Job Matcher",
     subtitle=(

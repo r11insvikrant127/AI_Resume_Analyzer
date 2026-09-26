@@ -451,3 +451,9 @@ def footer():
         """,
         unsafe_allow_html=True,
     )
+
+def inject_theme():
+    if st.session_state.get("_theme_injected"):
+        return
+    st.markdown(THEME_CSS, unsafe_allow_html=True)
+    st.session_state["_theme_injected"] = True

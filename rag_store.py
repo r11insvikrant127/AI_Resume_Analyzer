@@ -6,15 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from sentence_transformers import SentenceTransformer
-
-try:
-    import faiss
-    _HAS_FAISS = True
-except ImportError:
-    _HAS_FAISS = False
-    import chromadb  # fallback
-
+# Lazy import — do NOT import sentence_transformers at module level.
+# It pulls in torch, which costs 2-8 seconds at first import.
+_HAS_FAISS = None
+_faiss = None
+_chromadb = None
 
 INDEX_ROOT = Path("faiss_index")
 EMBED_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
@@ -22,9 +18,26 @@ EMBED_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 _model = None
 
 
+def _load_faiss_or_chroma():
+    """Load FAISS or ChromaDB lazily, on first use."""
+    global _HAS_FAISS, _faiss, _chromadb
+    if _HAS_FAISS is not None:
+        return
+    try:
+        import faiss as _f
+        _faiss = _f
+        _HAS_FAISS = True
+    except ImportError:
+        import chromadb as _c
+        _chromadb = _c
+        _HAS_FAISS = False
+
+
 def get_embedder():
+    """Load sentence-transformers lazily, on first embed call."""
     global _model
     if _model is None:
+        from sentence_transformers import SentenceTransformer
         _model = SentenceTransformer(EMBED_MODEL_NAME)
     return _model
 
@@ -49,16 +62,18 @@ def index_exists(company):
 
 
 def save_index(company, chunks, metadatas, vectors):
+    _load_faiss_or_chroma()
+
     d = _company_dir(company)
     d.mkdir(parents=True, exist_ok=True)
 
     if _HAS_FAISS:
         dim = vectors.shape[1]
-        index = faiss.IndexFlatIP(dim)   # inner product on normalized vecs = cosine
+        index = _faiss.IndexFlatIP(dim)   # inner product on normalized vecs = cosine
         index.add(vectors)
-        faiss.write_index(index, str(d / "index.faiss"))
+        _faiss.write_index(index, str(d / "index.faiss"))
     else:
-        client = chromadb.PersistentClient(path=str(d / "chroma"))
+        client = _chromadb.PersistentClient(path=str(d / "chroma"))
         col = client.get_or_create_collection(name="docs")
         col.add(
             documents=chunks,
@@ -72,23 +87,32 @@ def save_index(company, chunks, metadatas, vectors):
 
 
 def load_index(company):
+    _load_faiss_or_chroma()
+
     d = _company_dir(company)
 
     if not d.exists():
         return None
 
-    with open(d / "chunks.pkl", "rb") as f:
+    chunks_path = d / "chunks.pkl"
+    if not chunks_path.exists():
+        return None
+
+    with open(chunks_path, "rb") as f:
         data = pickle.load(f)
 
     if _HAS_FAISS:
         index_path = d / "index.faiss"
         if not index_path.exists():
             return None
-        index = faiss.read_index(str(index_path))
+        index = _faiss.read_index(str(index_path))
         return index, data["chunks"], data["metadatas"]
     else:
-        client = chromadb.PersistentClient(path=str(d / "chroma"))
-        col = client.get_collection(name="docs")
+        client = _chromadb.PersistentClient(path=str(d / "chroma"))
+        try:
+            col = client.get_collection(name="docs")
+        except Exception:
+            return None
         return col, data["chunks"], data["metadatas"]
 
 

@@ -61,3 +61,14 @@ def get_session():
 
     finally:
         session.close()
+
+import streamlit as st
+
+
+@st.cache_resource(show_spinner=False)
+def init_db_cached():
+    """
+    Run schema creation exactly once per Streamlit process.
+    """
+    init_db()
+    return True
