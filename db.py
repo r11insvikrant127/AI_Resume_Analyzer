@@ -1,17 +1,28 @@
 # db.py
 
 import os
+from pathlib import Path
 from contextlib import contextmanager
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from models import Base
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+pymysql://user:password@localhost:3306/resume_analyzer",
-)
+
+# Load .env from the project directory
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env", override=True)
+
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is missing. Please add it to the .env file."
+    )
+
 
 engine = create_engine(
     DATABASE_URL,
@@ -19,6 +30,7 @@ engine = create_engine(
     pool_recycle=280,
     future=True,
 )
+
 
 SessionLocal = sessionmaker(
     bind=engine,
@@ -37,11 +49,14 @@ def init_db():
 def get_session():
     """Yield a session and guarantee cleanup."""
     session = SessionLocal()
+
     try:
         yield session
         session.commit()
+
     except Exception:
         session.rollback()
         raise
+
     finally:
         session.close()
