@@ -166,11 +166,25 @@ def require_login():
 def render_logout_button():
     with st.sidebar:
         st.divider()
-        st.write(f"Signed in as **{st.session_state.get('user_name', '')}**")
+
+        user_name = st.session_state.get("user_name", "")
+        user_name = str(user_name).replace("*", "")
+
+        st.markdown(
+            f"Signed in as **{user_name}**"
+        )
+
         if st.button("Log out", use_container_width=True):
             for key in [
-                "user_id", "user_email", "user_name", "is_admin",
-                "analysis", "results", "rewrite", "recommendations",
+                "user_id",
+                "user_email",
+                "user_name",
+                "is_admin",
+                "analysis",
+                "results",
+                "rewrite",
+                "recommendations",
             ]:
                 st.session_state.pop(key, None)
+
             st.rerun()

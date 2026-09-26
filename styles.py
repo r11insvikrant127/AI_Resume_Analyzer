@@ -336,10 +336,6 @@ footer { visibility: hidden; }
 """
 
 
-def inject_theme():
-    """Call once per page, right after st.set_page_config."""
-    st.markdown(THEME_CSS, unsafe_allow_html=True)
-
 
 # ------------------------------------------------------------
 # Reusable HTML helpers
@@ -453,7 +449,34 @@ def footer():
     )
 
 def inject_theme():
-    if st.session_state.get("_theme_injected"):
-        return
+    """
+    Inject the theme CSS on every rerun.
+    Do NOT guard with st.session_state — Streamlit replaces
+    the DOM on rerun, so the CSS must be re-emitted.
+    """
     st.markdown(THEME_CSS, unsafe_allow_html=True)
-    st.session_state["_theme_injected"] = True
+
+def loading_bar():
+    """Show a moving blue bar at the very top of the page."""
+    placeholder = st.empty()
+    placeholder.markdown(
+        """
+        <div style="
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #2563eb, #60a5fa, #2563eb);
+            background-size: 200% 100%;
+            animation: slide 1.2s linear infinite;
+            z-index: 999999;
+        "></div>
+        <style>
+        @keyframes slide {
+            0%   { background-position: 0% 0; }
+            100% { background-position: 200% 0; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    return placeholder
