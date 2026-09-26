@@ -1,0 +1,6 @@
+[server]
+fileWatcherType = "watchdog"
+runOnSave = true
+
+[runner]
+fastReruns = true
