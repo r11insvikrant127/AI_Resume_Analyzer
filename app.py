@@ -9,7 +9,6 @@ from groq import Groq
 
 from analysis_pipeline import analyze_single_resume
 from comparison_view import render_comparison
-from admin_dashboard import render_admin_dashboard
 from auth_views import require_login, render_logout_button
 from report_view import render_single_report
 from llm_analysis import analyze_resume
@@ -134,10 +133,13 @@ def get_jd_keywords(job_description):
 
 
 # ============================================================
-# SIDEBAR + NAVIGATION
+# SIDEBAR
 # ============================================================
-
-page = "Analyzer"
+#
+# Navigation across pages is handled automatically by
+# Streamlit's pages/ folder. This sidebar only displays
+# project information.
+# ============================================================
 
 with st.sidebar:
 
@@ -170,13 +172,15 @@ with st.sidebar:
 
         MySQL Storage
 
+        FAISS Vector Search
+
         Prompt Engineering
         """
     )
 
     st.divider()
 
-    st.subheader("Analysis")
+    st.subheader("Features")
     st.write(
         """
         ATS Score
@@ -193,11 +197,11 @@ with st.sidebar:
 
         Multi-Resume Comparison
 
-        Strengths / Weaknesses
+        Resume History
 
-        Resume Improvements
+        Interview Chatbot
 
-        Interview Questions
+        Knowledge Base (RAG)
 
         Resume Rewriting
 
@@ -206,19 +210,6 @@ with st.sidebar:
         PDF Report Export
         """
     )
-
-    if st.session_state.get("is_admin"):
-        st.divider()
-        page = st.radio(
-            "Navigate",
-            ["Analyzer", "Admin Dashboard"],
-            key="nav_radio",
-        )
-
-
-if page == "Admin Dashboard":
-    render_admin_dashboard()
-    st.stop()
 
 
 # ============================================================
@@ -407,4 +398,4 @@ if (
 
 st.divider()
 
-st.caption("AI Resume Analyzer | Python + Streamlit + Groq + MySQL")
+st.caption("AI Resume Analyzer | Python + Streamlit + Groq + MySQL + FAISS")

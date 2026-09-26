@@ -5,18 +5,27 @@ import streamlit as st
 from candidate_ranker import rank_candidates, DEFAULT_WEIGHTS
 
 
-def render_comparison(results):
+def render_comparison(results, client=None, model=None):
     """
     Render the multi-resume comparison table and ranking.
 
-    `results` is a list of analysis dicts produced by
-    analyze_single_resume().
+    Parameters
+    ----------
+    results : list
+        List of analysis dicts produced by
+        analyze_single_resume().
+
+    client, model :
+        Optional Groq client + model name. When supplied,
+        the drill-down can render the rewrite / tips
+        expanders for the selected resume. When omitted,
+        the drill-down shows a report without extras.
     """
 
     st.header("Resume Comparison")
 
     # --------------------------------------------------------
-    # Ranking weights (Feature 2)
+    # Ranking weights
     # --------------------------------------------------------
 
     st.subheader("Ranking Weights")
@@ -170,12 +179,21 @@ def render_comparison(results):
             expanded=True,
         ):
             from report_view import render_single_report
-            render_single_report(selected_result)
+
+            render_single_report(
+                selected_result,
+                client=client,
+                model=model,
+                show_pdf_download=True,
+                # Do not duplicate rewrite / tips expanders here;
+                # the top-level single-report view already renders them.
+                show_extras=False,
+            )
 
     st.divider()
 
     # --------------------------------------------------------
-    # Comparison PDF (Feature 1 + 2)
+    # Comparison PDF
     # --------------------------------------------------------
 
     from report_generator import build_comparison_pdf
@@ -189,6 +207,7 @@ def render_comparison(results):
             file_name="resume_comparison_report.pdf",
             mime="application/pdf",
             use_container_width=True,
+            key="comparison_pdf_download",
         )
     except Exception as e:
         st.warning(f"Could not generate comparison PDF: {e}")

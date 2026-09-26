@@ -2,7 +2,8 @@
 
 from db import get_session
 from models import User, Resume, Analysis, RankingRun
-
+from datetime import datetime
+from models import User, Resume, Analysis, RankingRun, ChatSession, ChatMessage, RagCompany
 
 def create_user(email, password_hash, full_name=None, is_admin=False):
     with get_session() as s:
@@ -97,4 +98,154 @@ def list_all_analyses(limit=200):
             .order_by(Analysis.created_at.desc())
             .limit(limit)
             .all()
+        )
+
+# ------------------------------------------------------------------
+# HISTORY
+# ------------------------------------------------------------------
+
+def get_analysis_by_id(analysis_id, user_id=None):
+    """Fetch a single analysis, optionally enforcing ownership."""
+    with get_session() as s:
+        q = s.query(Analysis).filter(Analysis.id == analysis_id)
+        if user_id is not None:
+            q = q.filter(Analysis.user_id == user_id)
+        return q.first()
+
+
+def delete_analysis(analysis_id, user_id):
+    with get_session() as s:
+        row = (
+            s.query(Analysis)
+            .filter(Analysis.id == analysis_id,
+                    Analysis.user_id == user_id)
+            .first()
+        )
+        if row:
+            s.delete(row)
+            return True
+        return False
+
+
+def list_user_analyses_with_pagination(user_id, offset=0, limit=20):
+    with get_session() as s:
+        return (
+            s.query(Analysis)
+            .filter(Analysis.user_id == user_id)
+            .order_by(Analysis.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+
+def count_user_analyses(user_id):
+    with get_session() as s:
+        return (
+            s.query(Analysis)
+            .filter(Analysis.user_id == user_id)
+            .count()
+        )
+
+
+# ------------------------------------------------------------------
+# CHAT
+# ------------------------------------------------------------------
+
+def create_chat_session(user_id, mode, analysis_id=None,
+                        resume_name=None, title=None):
+    with get_session() as s:
+        cs = ChatSession(
+            user_id=user_id,
+            analysis_id=analysis_id,
+            resume_name=resume_name,
+            mode=mode,
+            title=title or f"{mode} — {resume_name or 'new'}",
+        )
+        s.add(cs)
+        s.flush()
+        return cs.id
+
+
+def append_chat_message(session_id, role, content):
+    with get_session() as s:
+        msg = ChatMessage(
+            session_id=session_id,
+            role=role,
+            content=content,
+        )
+        s.add(msg)
+        s.flush()
+        return msg.id
+
+
+def list_chat_messages(session_id):
+    with get_session() as s:
+        return (
+            s.query(ChatMessage)
+            .filter(ChatMessage.session_id == session_id)
+            .order_by(ChatMessage.created_at.asc())
+            .all()
+        )
+
+
+def list_user_chat_sessions(user_id, limit=50):
+    with get_session() as s:
+        return (
+            s.query(ChatSession)
+            .filter(ChatSession.user_id == user_id)
+            .order_by(ChatSession.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+
+def delete_chat_session(session_id, user_id):
+    with get_session() as s:
+        row = (
+            s.query(ChatSession)
+            .filter(ChatSession.id == session_id,
+                    ChatSession.user_id == user_id)
+            .first()
+        )
+        if row:
+            s.delete(row)
+            return True
+        return False
+
+
+# ------------------------------------------------------------------
+# RAG
+# ------------------------------------------------------------------
+
+def upsert_rag_company(company, doc_count, chunk_count):
+    with get_session() as s:
+        row = (
+            s.query(RagCompany)
+            .filter(RagCompany.company == company)
+            .first()
+        )
+        if row:
+            row.doc_count = doc_count
+            row.chunk_count = chunk_count
+            row.updated_at = datetime.utcnow()
+        else:
+            s.add(RagCompany(
+                company=company,
+                doc_count=doc_count,
+                chunk_count=chunk_count,
+            ))
+
+
+def list_rag_companies():
+    with get_session() as s:
+        return s.query(RagCompany).order_by(RagCompany.company.asc()).all()
+
+
+def get_rag_company(company):
+    with get_session() as s:
+        return (
+            s.query(RagCompany)
+            .filter(RagCompany.company == company)
+            .first()
         )

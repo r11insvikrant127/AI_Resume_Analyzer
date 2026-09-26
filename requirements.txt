@@ -8,3 +8,6 @@ sqlalchemy
 pymysql
 cryptography
 passlib[bcrypt]
+sentence-transformers
+faiss-cpu
+numpy

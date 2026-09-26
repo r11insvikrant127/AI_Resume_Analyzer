@@ -67,3 +67,41 @@ class RankingRun(Base):
     jd_text = Column(Text, nullable=False)
     rankings_json = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True, index=True)
+    resume_name = Column(String(255), nullable=True)
+    mode = Column(String(32), nullable=False)   # "simulation" | "qa"
+    title = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    messages = relationship("ChatMessage", back_populates="session",
+                            cascade="all, delete-orphan")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"),
+                        nullable=False, index=True)
+    role = Column(String(16), nullable=False)   # "system"|"user"|"assistant"
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    session = relationship("ChatSession", back_populates="messages")
+
+
+class RagCompany(Base):
+    __tablename__ = "rag_companies"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    company = Column(String(255), unique=True, nullable=False, index=True)
+    doc_count = Column(Integer, default=0, nullable=False)
+    chunk_count = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False,
+                        onupdate=datetime.utcnow)
