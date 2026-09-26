@@ -345,12 +345,23 @@ def _render_auth_tabs():
             st.rerun()
 
     # --------------------------------------------------------
-    # CONTENT
+    # ACTIVE TAB INDICATOR
     # --------------------------------------------------------
 
-    st.html("""
-    <div class="auth-tab-divider"></div>
-    """)
+    active_tab = st.session_state["auth_tab"]
+
+    if active_tab == "login":
+        active_class = "active-login"
+    else:
+        active_class = "active-signup"
+
+    st.html(
+        f"""
+        <div class="auth-tab-divider">
+            <div class="auth-tab-active-line {active_class}"></div>
+        </div>
+        """
+    )
 
     if st.session_state["auth_tab"] == "login":
 

@@ -837,17 +837,10 @@ def inject_theme():
         }
 
 
-        .st-key-auth_login_tab button {
-
-            color: #2563eb !important;
-
-            font-weight: 700 !important;
-        }
-
 
         /* =========================================================
-           TAB DIVIDER
-           ========================================================= */
+        TAB DIVIDER
+        ========================================================= */
 
         .auth-tab-divider {
 
@@ -865,13 +858,9 @@ def inject_theme():
         }
 
 
-        .auth-tab-divider::before {
-
-            content: "";
+        .auth-tab-active-line {
 
             position: absolute;
-
-            left: 0;
 
             top: -1px;
 
@@ -887,6 +876,20 @@ def inject_theme():
                 );
 
             border-radius: 2px;
+
+            transition: left 0.2s ease;
+        }
+
+
+        .auth-tab-active-line.active-login {
+
+            left: 0;
+        }
+
+
+        .auth-tab-active-line.active-signup {
+
+            left: 50%;
         }
 
 
@@ -972,6 +975,55 @@ def inject_theme():
                 ) !important;
         }
 
+        /* =========================================================
+        REMOVE STREAMLIT INPUT OUTER FOCUS / ERROR BOX
+        ========================================================= */
+
+        .st-key-auth-card [data-testid="stTextInput"] {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .st-key-auth-card [data-testid="stTextInput"] > div {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .st-key-auth-card [data-testid="stTextInput"] > div > div {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .st-key-auth-card [data-baseweb="input"] {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .st-key-auth-card [data-baseweb="base-input"] {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .st-key-auth-card [data-baseweb="input"]:focus-within,
+        .st-key-auth-card [data-baseweb="base-input"]:focus-within {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .st-key-auth-card input:focus {
+            outline: none !important;
+        }
+
+        /* Hide Streamlit's "Press Enter to submit form" hint */
+        .st-key-auth-card [data-testid="InputInstructions"] {
+            display: none !important;
+        }
 
         /* =========================================================
            PRIMARY BUTTON
@@ -1634,7 +1686,7 @@ def chip_row(items, kind):
 
 
 def sidebar_brand():
-    st.markdown(
+    st.html(
         """
         <div class="sidebar-brand">
 
@@ -1647,35 +1699,32 @@ def sidebar_brand():
             </div>
 
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def sidebar_section(title):
-    st.markdown(
+    st.html(
         f"""
         <div class="sidebar-section">
             {title}
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def sidebar_item(text):
-    st.markdown(
+    st.html(
         f"""
         <div class="sidebar-item">
             {text}
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def footer():
-    st.markdown(
+    st.html(
         """
         <div class="app-footer">
             AI Resume Analyzer ·
@@ -1685,8 +1734,7 @@ def footer():
             MySQL ·
             FAISS
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
