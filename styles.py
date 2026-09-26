@@ -58,6 +58,12 @@ def inject_theme():
 
             padding-top: 0.4rem !important;
             padding-bottom: 1rem !important;
+
+            width: 100% !important;
+            max-width: 100% !important;
+
+            margin-left: auto !important;
+            margin-right: auto !important;
         }
 
 
@@ -493,6 +499,22 @@ def inject_theme():
             height: 24px;
         }
 
+        /* =========================================================
+        CENTER ENTIRE AUTH SHELL
+        ========================================================= */
+
+        .st-key-auth-shell {
+
+            width: 680px !important;
+            max-width: 680px !important;
+
+            margin-left: auto !important;
+            margin-right: auto !important;
+
+            position: relative;
+
+            z-index: 10;
+        }
 
         /* =========================================================
            LOGO

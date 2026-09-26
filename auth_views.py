@@ -461,6 +461,7 @@ def require_login():
     # --------------------------------------------------------
 
     with st.container(
+        key="auth-shell",
         width=680,
         horizontal_alignment="center",
         gap="small"
