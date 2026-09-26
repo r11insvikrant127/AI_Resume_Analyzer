@@ -2,7 +2,7 @@
 
 import json
 import re
-
+from groq_helper import safe_chat
 
 REWRITE_SYSTEM = (
     "You are a professional resume writer. "
@@ -86,13 +86,15 @@ SOURCE RESUME:
 {resume_text}
 """
 
-    response = client.chat.completions.create(
+    response = safe_chat(
+        client=client,
         model=model,
         messages=[
             {"role": "system", "content": REWRITE_SYSTEM},
             {"role": "user", "content": prompt},
         ],
         temperature=0.3,
+        max_tokens=2500,
     )
 
     content = response.choices[0].message.content or ""

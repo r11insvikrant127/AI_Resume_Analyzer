@@ -2,7 +2,7 @@
 
 import json
 import re
-
+from groq_helper import safe_chat
 
 # ============================================================
 # ALLOWED SKILL CATEGORIES
@@ -651,7 +651,8 @@ Use exactly:
 }}
 """
 
-    response = client.chat.completions.create(
+    response = safe_chat(
+        client=client,
         model=model,
         messages=[
             {
@@ -664,12 +665,10 @@ Use exactly:
                     "Return valid JSON only."
                 )
             },
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "user", "content": prompt}
         ],
-        temperature=0
+        temperature=0,
+        max_tokens=2000,
     )
 
     content = (
@@ -1322,7 +1321,8 @@ JOB DESCRIPTION:
 {job_description}
 """
 
-    response = client.chat.completions.create(
+    response = safe_chat(
+        client=client,
         model=model,
         messages=[
             {
@@ -1334,12 +1334,10 @@ JOB DESCRIPTION:
                     "technologies as equivalent."
                 )
             },
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "user", "content": prompt}
         ],
-        temperature=0
+        temperature=0,
+        max_tokens=1500,
     )
 
     content = (

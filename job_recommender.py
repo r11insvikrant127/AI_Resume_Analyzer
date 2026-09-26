@@ -2,7 +2,7 @@
 
 import json
 import re
-
+from groq_helper import safe_chat
 
 SYSTEM = (
     "You are a career advisor. Recommend job roles that "
@@ -99,13 +99,15 @@ RESUME:
 {resume_text}
 """
 
-    response = client.chat.completions.create(
+    response = safe_chat(
+        client=client,
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": prompt},
         ],
         temperature=0.2,
+        max_tokens=1500,
     )
 
     content = response.choices[0].message.content or ""

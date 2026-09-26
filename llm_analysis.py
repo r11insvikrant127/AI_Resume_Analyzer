@@ -2,7 +2,7 @@
 
 import json
 import re
-
+from groq_helper import safe_chat
 
 def parse_json_response(content):
     """
@@ -97,7 +97,8 @@ JOB DESCRIPTION:
 {job_description}
 """
 
-    response = client.chat.completions.create(
+    response = safe_chat(
+        client=client,
         model=model,
         messages=[
             {
@@ -109,7 +110,8 @@ JOB DESCRIPTION:
             },
             {"role": "user", "content": prompt}
         ],
-        temperature=0.2
+        temperature=0.2,
+        max_tokens=1500,
     )
 
     content = response.choices[0].message.content or ""
@@ -162,7 +164,8 @@ Resume:
 Return only a numbered list.
 """
 
-    response = client.chat.completions.create(
+    response = safe_chat(
+        client=client,
         model=model,
         messages=[
             {
@@ -175,7 +178,8 @@ Return only a numbered list.
             },
             {"role": "user", "content": prompt}
         ],
-        temperature=0.3
+        temperature=0.3,
+        max_tokens=1500,
     )
 
     return response.choices[0].message.content or ""
