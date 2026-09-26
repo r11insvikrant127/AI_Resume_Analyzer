@@ -448,113 +448,100 @@ def require_login():
 
     _render_auth_background()
 
-    # --------------------------------------------------------
-    # TOP SPACING
-    # --------------------------------------------------------
-
     st.html("""
     <div class="auth-page-spacer"></div>
     """)
 
     # --------------------------------------------------------
-    # FIXED 680px CENTER CONTAINER
+    # CENTER AUTH CONTENT
     # --------------------------------------------------------
 
-    with st.container(
-        key="auth-shell",
-        width=680,
-        horizontal_alignment="center",
+    left_col, center_col, right_col = st.columns(
+        [1, 2, 1],
         gap="small"
-    ):
+    )
 
-        # ----------------------------------------------------
-        # LOGO
-        # ----------------------------------------------------
-
-        _render_logo()
-
-        # ----------------------------------------------------
-        # TITLE
-        # ----------------------------------------------------
-
-        st.html("""
-        <div class="auth-heading">
-
-            <div class="auth-title">
-                AI Resume <span>Analyzer</span>
-            </div>
-
-            <div class="auth-subtitle">
-                Analyze your resume. Match the right jobs.<br>
-                Build a stronger career profile.
-            </div>
-
-        </div>
-        """)
-
-        # ----------------------------------------------------
-        # LOGIN CARD
-        # ----------------------------------------------------
+    with center_col:
 
         with st.container(
-            key="auth-card",
-            width=560,
-            border=False,
+            key="auth-shell",
+            width="stretch",
+            horizontal_alignment="center",
             gap="small"
         ):
 
-            _render_auth_tabs()
+            # LOGO
+            _render_logo()
 
-        # ----------------------------------------------------
-        # TRUST ROW
-        # ----------------------------------------------------
+            # TITLE
+            st.html("""
+            <div class="auth-heading">
 
-        st.html("""
-        <div class="auth-tech-row">
+                <div class="auth-title">
+                    AI Resume <span>Analyzer</span>
+                </div>
 
-            <span class="auth-tech">
-                <span class="auth-tech-icon">⚡</span>
-                AI-powered
-            </span>
+                <div class="auth-subtitle">
+                    Analyze your resume. Match the right jobs.<br>
+                    Build a stronger career profile.
+                </div>
 
-            <span class="auth-tech-separator">|</span>
-
-            <span class="auth-tech">
-                <span class="auth-tech-icon">🔐</span>
-                Secure
-            </span>
-
-            <span class="auth-tech-separator">|</span>
-
-            <span class="auth-tech">
-                <span class="auth-tech-icon">🎯</span>
-                Job matching
-            </span>
-
-        </div>
-        """)
-
-        # ----------------------------------------------------
-        # FOOTER
-        # ----------------------------------------------------
-
-        st.html("""
-        <div class="auth-footer">
-
-            <div class="auth-footer-title">
-                AI Resume Analyzer
             </div>
+            """)
 
-            <div class="auth-footer-stack">
-                Python · Streamlit · Groq · MySQL · FAISS
+            # LOGIN CARD
+            with st.container(
+                key="auth-card",
+                width=560,
+                border=False,
+                gap="small"
+            ):
+                _render_auth_tabs()
+
+            # TRUST ROW
+            st.html("""
+            <div class="auth-tech-row">
+
+                <span class="auth-tech">
+                    <span class="auth-tech-icon">⚡</span>
+                    AI-powered
+                </span>
+
+                <span class="auth-tech-separator">|</span>
+
+                <span class="auth-tech">
+                    <span class="auth-tech-icon">🔐</span>
+                    Secure
+                </span>
+
+                <span class="auth-tech-separator">|</span>
+
+                <span class="auth-tech">
+                    <span class="auth-tech-icon">🎯</span>
+                    Job matching
+                </span>
+
             </div>
+            """)
 
-            <div class="auth-footer-note">
-                Your resume. Your data. Your career.
+            # FOOTER
+            st.html("""
+            <div class="auth-footer">
+
+                <div class="auth-footer-title">
+                    AI Resume Analyzer
+                </div>
+
+                <div class="auth-footer-stack">
+                    Python · Streamlit · Groq · MySQL · FAISS
+                </div>
+
+                <div class="auth-footer-note">
+                    Your resume. Your data. Your career.
+                </div>
+
             </div>
-
-        </div>
-        """)
+            """)
 
     return False
 

@@ -499,22 +499,6 @@ def inject_theme():
             height: 24px;
         }
 
-        /* =========================================================
-        CENTER ENTIRE AUTH SHELL
-        ========================================================= */
-
-        .st-key-auth-shell {
-
-            width: 680px !important;
-            max-width: 680px !important;
-
-            margin-left: auto !important;
-            margin-right: auto !important;
-
-            position: relative;
-
-            z-index: 10;
-        }
 
         /* =========================================================
            LOGO
