@@ -12,8 +12,17 @@ from comparison_view import render_comparison
 from auth_views import require_login, render_logout_button
 from report_view import render_single_report
 from llm_analysis import analyze_resume
-
 from keyword_analyzer import extract_keywords_from_jd
+
+from styles import (
+    inject_theme,
+    hero,
+    section,
+    sidebar_brand,
+    sidebar_section,
+    sidebar_item,
+    footer,
+)
 
 
 # ============================================================
@@ -28,10 +37,7 @@ init_db()
 API_KEY = os.getenv("GROQ_API_KEY")
 
 if not API_KEY:
-    st.error(
-        "GROQ_API_KEY is missing. "
-        "Please add it to your .env file."
-    )
+    st.error("GROQ_API_KEY is missing. Add it to your .env file.")
     st.stop()
 
 client = Groq(api_key=API_KEY)
@@ -39,7 +45,7 @@ MODEL = "openai/gpt-oss-120b"
 
 
 # ============================================================
-# PAGE CONFIG
+# PAGE CONFIG + THEME
 # ============================================================
 
 st.set_page_config(
@@ -48,37 +54,8 @@ st.set_page_config(
     layout="wide",
 )
 
-
-# ============================================================
-# CUSTOM CSS
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-    .main-title {
-        font-size: 42px;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
-
-    .subtitle {
-        font-size: 18px;
-        color: #666;
-        margin-bottom: 25px;
-    }
-
-    .formula {
-        font-family: monospace;
-        background: #f6f6f6;
-        padding: 12px 16px;
-        border-radius: 8px;
-        border: 1px solid #e2e2e2;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Inject theme BEFORE the auth gate so the login page is styled
+inject_theme()
 
 
 # ============================================================
@@ -92,20 +69,21 @@ render_logout_button()
 
 
 # ============================================================
-# TITLE
+# HERO
 # ============================================================
 
-st.markdown(
-    '<div class="main-title">AI Resume Analyzer & Job Matcher</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="subtitle">'
-    'Analyze your resume against a job description '
-    'using Generative AI.'
-    '</div>',
-    unsafe_allow_html=True,
+hero(
+    title="AI Resume Analyzer & Job Matcher",
+    subtitle=(
+        "Compare your resume against any job description, "
+        "find skill gaps, and get AI-generated feedback."
+    ),
+    badges=[
+        "ATS Scoring",
+        "Multi-Resume Ranking",
+        "Interview Chatbot",
+        "Knowledge Base",
+    ],
 )
 
 
@@ -114,10 +92,6 @@ st.markdown(
 # ============================================================
 
 def get_jd_keywords(job_description):
-    """
-    Cache JD requirement extraction for the current session.
-    """
-
     cache = st.session_state.setdefault("jd_keyword_cache", {})
     key = job_description.strip()
 
@@ -127,7 +101,6 @@ def get_jd_keywords(job_description):
     requirement_data = extract_keywords_from_jd(
         client, MODEL, job_description
     )
-
     cache[key] = requirement_data
     return requirement_data
 
@@ -135,114 +108,74 @@ def get_jd_keywords(job_description):
 # ============================================================
 # SIDEBAR
 # ============================================================
-#
-# Navigation across pages is handled automatically by
-# Streamlit's pages/ folder. This sidebar only displays
-# project information.
-# ============================================================
 
 with st.sidebar:
 
-    st.header("Project Information")
+    sidebar_brand()
 
-    st.write(
-        """
-        This application uses Generative AI for semantic
-        job-description analysis, resume matching, and
-        qualitative resume analysis.
+    sidebar_section("Technology")
+    for item in [
+        "🐍 Python",
+        "⚡ Streamlit",
+        "🤖 Groq · LLM",
+        "📄 PDF & DOCX",
+        "🗄️ MySQL",
+        "🔎 FAISS Vector Search",
+    ]:
+        sidebar_item(item)
 
-        Python performs the numerical ATS calculations.
-        """
-    )
-
-    st.divider()
-
-    st.subheader("Technology")
-    st.write(
-        """
-        Python
-
-        Streamlit
-
-        Groq
-
-        LLM
-
-        PDF & DOCX Processing
-
-        MySQL Storage
-
-        FAISS Vector Search
-
-        Prompt Engineering
-        """
-    )
-
-    st.divider()
-
-    st.subheader("Features")
-    st.write(
-        """
-        ATS Score
-
-        ATS Keyword Analysis
-
-        Requirement Matching
-
-        Technical Skill Match
-
-        Skill Gaps
-
-        Candidate Ranking
-
-        Multi-Resume Comparison
-
-        Resume History
-
-        Interview Chatbot
-
-        Knowledge Base (RAG)
-
-        Resume Rewriting
-
-        Job Recommendations
-
-        PDF Report Export
-        """
-    )
+    sidebar_section("Capabilities")
+    for item in [
+        "📊 ATS Score",
+        "🔑 Keyword Analysis",
+        "🎯 Requirement Matching",
+        "🧠 Skill Gap Analysis",
+        "🏆 Candidate Ranking",
+        "📚 Resume History",
+        "🎤 Interview Chatbot",
+        "📖 Knowledge Base",
+        "✍️ Resume Rewriting",
+        "💼 Job Recommendations",
+        "⬇️ PDF Export",
+    ]:
+        sidebar_item(item)
 
 
 # ============================================================
 # MAIN INPUTS
 # ============================================================
 
-col1, col2 = st.columns(2)
+section("📤", "Analyze a Resume", "Upload one or more resumes and paste the JD")
+
+col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    st.subheader("1. Upload Resume")
-    uploaded_files = st.file_uploader(
-        "Upload Resume(s) — PDF or DOCX",
-        type=["pdf", "docx"],
-        accept_multiple_files=True,
-    )
+    with st.container(border=True):
+        st.markdown("**1 · Upload Resume(s)**")
+        st.caption("PDF or DOCX · multiple files supported")
+        uploaded_files = st.file_uploader(
+            "Upload Resume(s)",
+            type=["pdf", "docx"],
+            accept_multiple_files=True,
+            label_visibility="collapsed",
+        )
 
 with col2:
-    st.subheader("2. Job Description")
-    job_description = st.text_area(
-        "Paste the job description here",
-        height=250,
-        placeholder="Paste the complete job description...",
-    )
+    with st.container(border=True):
+        st.markdown("**2 · Job Description**")
+        st.caption("Paste the full JD for best matching accuracy")
+        job_description = st.text_area(
+            "Job Description",
+            height=210,
+            placeholder="Paste the complete job description here...",
+            label_visibility="collapsed",
+        )
 
 
-# ============================================================
-# ANALYZE BUTTON
-# ============================================================
-
-st.divider()
+st.write("")
 
 analyze_button = st.button(
-    "Analyze Resume",
+    "🚀 Analyze Resume",
     type="primary",
     use_container_width=True,
 )
@@ -315,9 +248,7 @@ if analyze_button:
                         f"could not persist to DB ({db_err})."
                     )
 
-                # Attach JD text so report_view can render rewrite
                 result["job_description"] = job_description
-
                 results.append(result)
 
         except Exception as e:
@@ -337,7 +268,6 @@ if analyze_button:
     st.session_state["results"] = results
     st.session_state["job_description"] = job_description
 
-    # Clear per-resume derived state
     for key in list(st.session_state.keys()):
         if (
             key.startswith("rewrite_")
@@ -353,7 +283,7 @@ if analyze_button:
         st.session_state.pop("analysis", None)
         st.session_state.pop("resume_text", None)
 
-    st.success(f"Analyzed {len(results)} resume(s).")
+    st.success(f"✅ Analyzed {len(results)} resume(s).")
 
 
 # ============================================================
@@ -362,8 +292,7 @@ if analyze_button:
 
 if "analysis" in st.session_state:
 
-    st.divider()
-    st.header("Resume Analysis Report")
+    section("📊", "Resume Analysis Report")
 
     render_single_report(
         st.session_state["analysis"],
@@ -383,7 +312,7 @@ if (
     and len(st.session_state["results"]) > 1
 ):
 
-    st.divider()
+    section("🏆", "Resume Comparison")
 
     render_comparison(
         st.session_state["results"],
@@ -396,6 +325,4 @@ if (
 # FOOTER
 # ============================================================
 
-st.divider()
-
-st.caption("AI Resume Analyzer | Python + Streamlit + Groq + MySQL + FAISS")
+footer()

@@ -1,0 +1,100 @@
+ACCENTURE – APPLICATION DEVELOPMENT ASSOCIATE
+SAMPLE JOB DESCRIPTION
+
+Role:
+Application Development Associate
+
+Experience:
+Entry-level / Graduate
+
+Job Summary
+
+As an Application Development Associate, you will work with technology teams
+to design, develop, test, configure, and maintain software applications that
+address business requirements.
+
+You may work with other developers, analysts, testers, and client-facing teams
+to understand requirements and deliver reliable technology solutions.
+
+Responsibilities
+
+1. Understand business and technical requirements.
+
+2. Design and develop software applications according to project requirements.
+
+3. Write clean, maintainable, and testable code.
+
+4. Debug applications and resolve technical issues.
+
+5. Participate in software testing and troubleshooting.
+
+6. Work with databases and APIs when required by the project.
+
+7. Collaborate with team members during development and deployment.
+
+8. Learn and apply new technologies based on project requirements.
+
+9. Follow software development practices, coding standards, and documentation
+   requirements.
+
+10. Communicate technical issues and solutions clearly to team members.
+
+Preferred Technical Skills
+
+Candidates may benefit from knowledge of:
+
+- Programming fundamentals
+- Data Structures and Algorithms
+- Object-Oriented Programming
+- SQL and relational databases
+- Computer Networks
+- Operating Systems
+- Software Engineering
+- Web development
+- REST APIs
+- Git and version control
+- Cloud fundamentals
+
+Programming Languages
+
+Depending on the project, candidates may work with languages such as:
+
+- Java
+- Python
+- C++
+- JavaScript
+- SQL
+
+Problem-Solving Skills
+
+Candidates should be able to:
+
+- Break complex problems into smaller components.
+- Analyze requirements.
+- Select appropriate data structures and algorithms.
+- Debug code systematically.
+- Explain their technical decisions.
+- Consider time and space complexity.
+
+Soft Skills
+
+Important professional skills include:
+
+- Communication
+- Teamwork
+- Adaptability
+- Problem solving
+- Learning ability
+- Time management
+- Collaboration
+
+Education
+
+For specific roles, educational requirements are defined in the individual
+job description. Graduate technology opportunities may include B.E./B.Tech
+and other relevant degree backgrounds depending on the role.
+
+Important Note
+
+This document is a sample job description for a Knowledge Base demonstration.
+Actual Accenture job requirements vary by position and location.

@@ -1,0 +1,141 @@
+ACCENTURE – INTERVIEW AND RECRUITMENT PROCESS
+
+Overview
+
+Accenture's recruitment process varies depending on the role, location,
+experience level, and skills required.
+
+There is no single fixed interview process that applies to every position.
+
+Typical Recruitment Flow
+
+1. Application Submission
+
+The candidate applies for a specific position through the Accenture careers
+platform or another authorized recruiting channel.
+
+After applying, the candidate receives confirmation that the application has
+been received.
+
+2. Application Review
+
+Recruiters review the candidate's application and assess how the candidate's
+skills and experience match the role.
+
+Recruiters may also identify other suitable opportunities, but a separate
+application may be required for another role.
+
+3. Interview Invitation
+
+If the candidate is selected to continue, Accenture contacts the candidate to
+schedule an interview.
+
+Communication may take place through email or phone.
+
+4. Interview
+
+Interviews may be conducted by phone, video, or in person.
+
+The number and type of interviews depend on the specific role.
+
+Interview topics may include:
+
+- Technical knowledge
+- Problem solving
+- Role-specific skills
+- Previous projects and experience
+- Communication
+- Behavioral questions
+- Situational questions
+
+Candidates should be prepared to explain projects listed on their resume,
+including their responsibilities, technical decisions, challenges, and results.
+
+5. Technical Assessment
+
+For some roles, candidates may be asked to complete an online technical
+assessment.
+
+The assessment may evaluate:
+
+- Problem solving
+- Logical reasoning
+- Applied technical knowledge
+- Coding ability
+- Ability to structure a solution
+
+Accenture states that assessments are designed around skills relevant to the
+role.
+
+Assessment Timing
+
+The assessment is generally completed online within the timeframe specified
+in the invitation.
+
+Accenture states that assessments are typically completed in one sitting and
+may take approximately 30–90 minutes depending on the assessment and
+candidate proficiency.
+
+The invitation provides the applicable time limit.
+
+6. Skills Assessment and Role-Specific Evaluation
+
+Depending on the position, candidates may be evaluated on technical skills,
+natural strengths, decision-making, or other capabilities relevant to the
+role.
+
+The exact assessment depends on the position.
+
+7. Final Decision
+
+After the relevant interviews and assessments, the recruiting team evaluates
+the candidate.
+
+If selected, Accenture contacts the candidate regarding an offer and the next
+steps.
+
+Important Interview Preparation Areas
+
+Candidates applying for entry-level technology roles should be prepared to
+discuss:
+
+Technical Fundamentals:
+- Data Structures and Algorithms
+- Object-Oriented Programming
+- DBMS and SQL
+- Operating Systems
+- Computer Networks
+- Software Engineering
+
+Programming:
+- One or more programming languages
+- Problem solving
+- Coding questions
+- Debugging
+
+Projects:
+- Project architecture
+- Technologies used
+- Individual contribution
+- Challenges faced
+- Technical decisions
+- Improvements and future scope
+
+Behavioral Questions:
+- Tell me about yourself.
+- Why do you want to join Accenture?
+- Why should we hire you?
+- What are your strengths and weaknesses?
+- Describe a challenge you faced.
+- How do you handle deadlines?
+- How do you handle disagreements within a team?
+- Where do you see yourself in five years?
+
+Important Note
+
+The actual recruitment process is role-specific. Candidates should follow the
+instructions in their assessment invitation and communication from the
+recruiting team.
+
+There may not be the same number of interview rounds for every Accenture
+position.

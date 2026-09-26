@@ -1,6 +1,8 @@
 # chat_view.py
 
 import streamlit as st
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 from db_operations import (
     create_chat_session,
@@ -15,6 +17,16 @@ from interview_chatbot import (
     answer_question,
 )
 
+def to_ist(dt):
+    """Convert a stored UTC timestamp to Indian Standard Time."""
+    if dt is None:
+        return ""
+
+    # MySQL/SQLAlchemy currently stores UTC as a naive datetime.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    return dt.astimezone(ZoneInfo("Asia/Kolkata"))
 
 def _history_as_messages(rows):
     return [{"role": r.role, "content": r.content} for r in rows]
@@ -52,7 +64,7 @@ def render_chat(client, model, analysis, mode):
                 with c1:
                     if st.button(
                         f"#{s.id} — {s.title} "
-                        f"({s.created_at.strftime('%Y-%m-%d %H:%M')})",
+                        f"({to_ist(s.created_at).strftime('%Y-%m-%d %H:%M')})",
                         key=f"load_chat_{s.id}",
                     ):
                         st.session_state[key] = s.id

@@ -37,19 +37,23 @@ def render_single_report(
     # HEADLINE METRICS
     # --------------------------------------------------------
 
+    from styles import section, score_card, chip_row
+
     score = result.get("ats_score", 0)
     required_score = result.get("required_match_percentage", 0)
     technical_score = result.get("technical_skill_percentage", 0)
     good_to_have_score = result.get("good_to_have_match_percentage", 0)
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        st.metric("ATS Score", f"{score}%")
+        score_card("ATS Score", score, "weighted overall")
     with c2:
-        st.metric("Required Requirement Match", f"{required_score}%")
+        score_card("Required Match", required_score, "required reqs")
     with c3:
-        st.metric("Technical Skill Match", f"{technical_score}%")
+        score_card("Technical Match", technical_score, "technical reqs")
+    with c4:
+        score_card("Good-to-Have", good_to_have_score, "optional reqs")
 
     st.progress(min(max(score, 0), 100) / 100)
 
@@ -57,7 +61,7 @@ def render_single_report(
     # SCORE CALCULATION
     # --------------------------------------------------------
 
-    st.subheader("How This ATS Score Was Calculated")
+    section("🧮", "How This ATS Score Was Calculated")
 
     req_contribution = round(required_score * 0.50, 2)
     technical_contribution = round(technical_score * 0.40, 2)
@@ -114,36 +118,30 @@ def render_single_report(
     # REQUIRED REQUIREMENTS
     # --------------------------------------------------------
 
-    st.markdown("### Required Requirements")
+    section("🎯", "Required Requirements")
 
     rc1, rc2, rc3 = st.columns(3)
 
     with rc1:
-        st.markdown("#### Matched")
-        items = result.get("matched_required_requirements", [])
-        if items:
-            for x in items:
-                st.write(f"✓ {x}")
-        else:
-            st.write("No required requirements matched.")
+        st.markdown("**✅ Matched**")
+        chip_row(
+            result.get("matched_required_requirements", []),
+            "matched",
+        )
 
     with rc2:
-        st.markdown("#### Partial")
-        items = result.get("partial_required_requirements", [])
-        if items:
-            for x in items:
-                st.write(f"~ {x}")
-        else:
-            st.write("No partial required matches.")
+        st.markdown("**⚠️ Partial**")
+        chip_row(
+            result.get("partial_required_requirements", []),
+            "partial",
+        )
 
     with rc3:
-        st.markdown("#### Missing")
-        items = result.get("missing_required_requirements", [])
-        if items:
-            for x in items:
-                st.write(f"• {x}")
-        else:
-            st.write("No required requirements are missing.")
+        st.markdown("**❌ Missing**")
+        chip_row(
+            result.get("missing_required_requirements", []),
+            "missing",
+        )
 
     # --------------------------------------------------------
     # GOOD-TO-HAVE REQUIREMENTS
@@ -184,7 +182,7 @@ def render_single_report(
     # TECHNICAL SKILL MATCH
     # --------------------------------------------------------
 
-    st.subheader("Technical Skill Match Detail")
+    section("🧠", "Technical Skill Match Detail")
 
     st.caption(
         "This component considers required technical "
@@ -239,7 +237,7 @@ def render_single_report(
     # ATS KEYWORD ANALYSIS
     # --------------------------------------------------------
 
-    st.subheader("🔑 ATS Keyword Analysis")
+    section("🔑", "ATS Keyword Analysis")
 
     ats_kw = result.get("ats_keyword_analysis", {}) or {}
     kw_rows = ats_kw.get("keyword_rows", [])
@@ -299,7 +297,7 @@ def render_single_report(
     # NON-TECHNICAL REQUIREMENTS
     # --------------------------------------------------------
 
-    st.subheader("Other Required Skills")
+    section("🧩", "Other Required Skills")
 
     st.caption(
         "These requirements are part of the job description "
@@ -329,7 +327,7 @@ def render_single_report(
     # SKILL GAP ANALYSIS
     # --------------------------------------------------------
 
-    st.subheader("Skill Gap Analysis")
+    section("📉", "Skill Gap Analysis")
 
     skill_gap = result.get("skill_gap", {}) or {}
 
@@ -397,7 +395,7 @@ def render_single_report(
     # CANDIDATE SUMMARY
     # --------------------------------------------------------
 
-    st.subheader("Candidate Summary")
+    section("👤", "Candidate Summary")
     st.write(result.get("candidate_summary", "No summary available."))
 
     # --------------------------------------------------------
@@ -441,7 +439,7 @@ def render_single_report(
     # RESUME IMPROVEMENTS
     # --------------------------------------------------------
 
-    st.subheader("Resume Improvement Recommendations")
+    section("💡", "Resume Improvement Recommendations")
 
     improvements = result.get("resume_improvements", [])
     if improvements:
@@ -454,7 +452,7 @@ def render_single_report(
     # INTERVIEW QUESTIONS
     # --------------------------------------------------------
 
-    st.subheader("AI-Generated Interview Questions")
+    section("🎤", "AI-Generated Interview Questions")
 
     questions = result.get("interview_questions", [])
     if questions:
