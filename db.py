@@ -46,7 +46,8 @@ engine = create_engine(
     pool_pre_ping=True,
     pool_recycle=280,
     connect_args={
-        "connect_timeout": 30
+        "ssl": {},
+        "connect_timeout": 30,
     },
     future=True,
 )
