@@ -1,9 +1,8 @@
-# db.py
-
 import os
 from pathlib import Path
 from contextlib import contextmanager
 
+import streamlit as st
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,26 +10,51 @@ from sqlalchemy.orm import sessionmaker
 from models import Base
 
 
-# Load .env from the project directory
+# ============================================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================================
+
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env", override=True)
 
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# ============================================================
+# DATABASE URL
+# Streamlit Cloud → st.secrets
+# Local development → .env
+# ============================================================
+
+try:
+    DATABASE_URL = st.secrets["DATABASE_URL"]
+except Exception:
+    DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 if not DATABASE_URL:
     raise RuntimeError(
-        "DATABASE_URL is missing. Please add it to the .env file."
+        "DATABASE_URL is missing. "
+        "Add it to Streamlit Secrets or your .env file."
     )
 
+
+# ============================================================
+# DATABASE ENGINE
+# ============================================================
 
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=280,
+    connect_args={
+        "connect_timeout": 30
+    },
     future=True,
 )
 
+
+# ============================================================
+# SESSION
+# ============================================================
 
 SessionLocal = sessionmaker(
     bind=engine,
@@ -41,14 +65,23 @@ SessionLocal = sessionmaker(
 )
 
 
+# ============================================================
+# INITIALIZE DATABASE
+# ============================================================
+
 def init_db():
     """Create all tables if they do not yet exist."""
     Base.metadata.create_all(bind=engine)
 
 
+# ============================================================
+# DATABASE SESSION CONTEXT MANAGER
+# ============================================================
+
 @contextmanager
 def get_session():
     """Yield a session and guarantee cleanup."""
+
     session = SessionLocal()
 
     try:
@@ -62,13 +95,17 @@ def get_session():
     finally:
         session.close()
 
-import streamlit as st
 
+# ============================================================
+# STREAMLIT CACHED DATABASE INITIALIZATION
+# ============================================================
 
 @st.cache_resource(show_spinner=False)
 def init_db_cached():
     """
-    Run schema creation exactly once per Streamlit process.
+    Run schema creation once per Streamlit process.
     """
+
     init_db()
+
     return True

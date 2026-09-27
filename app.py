@@ -34,10 +34,24 @@ load_dotenv()
 from db import init_db_cached
 init_db_cached()
 
-API_KEY = os.getenv("GROQ_API_KEY")
+
+# ------------------------------------------------------------
+# GROQ API KEY
+# Streamlit Cloud → st.secrets
+# Local development → .env
+# ------------------------------------------------------------
+
+try:
+    API_KEY = st.secrets["GROQ_API_KEY"]
+except Exception:
+    API_KEY = os.getenv("GROQ_API_KEY")
+
 
 if not API_KEY:
-    st.error("GROQ_API_KEY is missing. Add it to your .env file.")
+    st.error(
+        "GROQ_API_KEY is missing. "
+        "Add it to Streamlit Secrets or your .env file."
+    )
     st.stop()
 
 @st.cache_resource(show_spinner=False)
