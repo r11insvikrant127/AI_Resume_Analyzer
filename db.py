@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import streamlit as st
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from models import Base
@@ -38,11 +39,26 @@ if not DATABASE_URL:
 
 
 # ============================================================
+# CLEAN DATABASE URL
+# ============================================================
+
+db_url = make_url(DATABASE_URL)
+
+# Remove URL-based ssl parameter.
+# PyMySQL expects SSL configuration as a dictionary,
+# not the string "true".
+if "ssl" in db_url.query:
+    query = dict(db_url.query)
+    query.pop("ssl", None)
+    db_url = db_url.set(query=query)
+
+
+# ============================================================
 # DATABASE ENGINE
 # ============================================================
 
 engine = create_engine(
-    DATABASE_URL,
+    db_url,
     pool_pre_ping=True,
     pool_recycle=280,
     connect_args={
@@ -106,7 +122,5 @@ def init_db_cached():
     """
     Run schema creation once per Streamlit process.
     """
-
     init_db()
-
     return True
