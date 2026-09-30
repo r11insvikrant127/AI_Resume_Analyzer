@@ -14,13 +14,15 @@ def safe_chat(
     temperature=0.2,
     max_tokens=DEFAULT_MAX_TOKENS,
     max_retries=3,
+    response_format=None,
 ):
     """
     Wrapper around client.chat.completions.create that:
 
-    - Caps output tokens (so max_tokens doesn't blow the TPM budget).
-    - Retries on 429 rate-limit errors, respecting the retry-after header.
-    - Retries on transient 5xx errors with exponential backoff.
+    - Caps output tokens.
+    - Optionally enforces JSON response format.
+    - Retries on 429 rate-limit errors.
+    - Retries on transient 5xx errors.
     """
 
     last_error = None
@@ -28,11 +30,19 @@ def safe_chat(
     for attempt in range(max_retries):
 
         try:
+
+            request_kwargs = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+
+            if response_format is not None:
+                request_kwargs["response_format"] = response_format
+
             return client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
+                **request_kwargs
             )
 
         except APIStatusError as e:
@@ -41,11 +51,15 @@ def safe_chat(
             status = getattr(e, "status_code", None)
 
             if status == 429:
-                # Rate limit — respect retry-after if present
+
                 retry_after = 5
+
                 try:
                     retry_after = int(
-                        e.response.headers.get("retry-after", 5)
+                        e.response.headers.get(
+                            "retry-after",
+                            5
+                        )
                     )
                 except Exception:
                     pass
@@ -53,12 +67,11 @@ def safe_chat(
                 time.sleep(retry_after + 1)
 
             elif status and 500 <= status < 600:
-                # Transient server error — exponential backoff
+
                 time.sleep(2 ** attempt)
 
             else:
-                # Anything else — do not retry
+
                 raise
 
-    # Retries exhausted
     raise last_error

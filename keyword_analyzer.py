@@ -669,6 +669,7 @@ Use exactly:
         ],
         temperature=0,
         max_tokens=2000,
+        response_format={"type": "json_object"},
     )
 
     content = (
@@ -1338,6 +1339,7 @@ JOB DESCRIPTION:
         ],
         temperature=0,
         max_tokens=1500,
+        response_format={"type": "json_object"},
     )
 
     content = (
