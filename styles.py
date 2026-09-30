@@ -80,7 +80,24 @@ THEME_CSS = """
 
     margin: 0 !important;
 }
+/* Remove Streamlit's top/header whitespace */
+header[data-testid="stHeader"] {
+    height: 0 !important;
+    min-height: 0 !important;
+    background: transparent !important;
+}
 
+header[data-testid="stHeader"] > div {
+    height: 0 !important;
+}
+
+[data-testid="stAppViewContainer"] {
+    padding-top: 0 !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+    padding-top: 0 !important;
+}
 
 h1, h2, h3 {
     letter-spacing: -0.01em;
