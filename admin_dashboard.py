@@ -1,4 +1,3 @@
-import copy
 import streamlit as st
 from datetime import timezone
 from zoneinfo import ZoneInfo
@@ -496,48 +495,6 @@ def _render_analysis_result(row):
             st.caption(
                 "No ATS keyword details available."
             )
-
-    # --------------------------------------------------------
-    # FULL STORED RESULT
-    # --------------------------------------------------------
-
-    with st.expander(
-        "🔧 View full stored analysis JSON"
-    ):
-
-        display_result = copy.deepcopy(
-            result
-        )
-
-        # Avoid displaying the entire resume
-        # text inside the JSON viewer.
-        display_result.pop(
-            "resume_text",
-            None
-        )
-
-        st.json(
-            display_result
-        )
-
-    # --------------------------------------------------------
-    # EXTRACTED RESUME TEXT
-    # --------------------------------------------------------
-
-    resume_text = result.get(
-        "resume_text"
-    )
-
-    if resume_text:
-
-        with st.expander(
-            "📄 View extracted resume text"
-        ):
-
-            st.text(
-                resume_text
-            )
-
 
 # ============================================================
 # ADMIN DASHBOARD
