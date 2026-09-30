@@ -70,15 +70,15 @@ THEME_CSS = """
    ========================================================= */
 
 .block-container {
-
-    padding-top: 1.5rem !important;
-    padding-bottom: 3rem !important;
-
     width: 100% !important;
-    max-width: 1300px !important;
+    max-width: none !important;
 
-    margin-left: auto !important;
-    margin-right: auto !important;
+    padding-top: 0 !important;
+    padding-bottom: 3rem !important;
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+
+    margin: 0 !important;
 }
 
 
