@@ -1499,6 +1499,11 @@ h1, h2, h3 {
 #MainMenu { visibility: hidden; }
 footer     { visibility: hidden; }
 
+/* Hide Streamlit top-right toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
 
 /* =========================================================
    RESPONSIVE — TABLET
