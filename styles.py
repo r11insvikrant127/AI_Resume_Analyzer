@@ -1500,74 +1500,123 @@ h1, h2, h3 {
     top: 0;
     left: 0;
     width: 100%;
-    height: 68px;
+    height: 80px;
     overflow: hidden;
     pointer-events: none;
-    z-index: 0;
+    z-index: 9999;
 }
 
-.top-wave::before,
+/* First wave */
+.top-wave::before {
+    content: "";
+    position: absolute;
+
+    width: 120%;
+    height: 95px;
+
+    left: -10%;
+    top: 35px;
+
+    border-radius: 50%;
+
+    background: linear-gradient(
+        90deg,
+        rgba(37, 99, 235, 0.00),
+        rgba(37, 99, 235, 0.20),
+        rgba(79, 70, 229, 0.18),
+        rgba(96, 165, 250, 0.20),
+        rgba(37, 99, 235, 0.00)
+    );
+
+    filter: blur(10px);
+
+    animation: topWaveOne 8s ease-in-out infinite alternate;
+}
+
+/* Second wave */
 .top-wave::after {
     content: "";
     position: absolute;
-    left: -10%;
-    width: 120%;
-    height: 55px;
+
+    width: 125%;
+    height: 75px;
+
+    left: -12%;
+    top: 48px;
+
     border-radius: 50%;
-    opacity: 0.55;
+
+    background: linear-gradient(
+        90deg,
+        rgba(129, 140, 248, 0.00),
+        rgba(129, 140, 248, 0.18),
+        rgba(37, 99, 235, 0.16),
+        rgba(96, 165, 250, 0.18),
+        rgba(129, 140, 248, 0.00)
+    );
+
+    filter: blur(8px);
+
+    animation: topWaveTwo 10s ease-in-out infinite alternate;
 }
 
-.top-wave::before {
-    top: 18px;
-    background:
-        radial-gradient(
-            ellipse at center,
-            rgba(37, 99, 235, 0.16) 0%,
-            rgba(79, 70, 229, 0.10) 45%,
-            transparent 72%
-        );
-    filter: blur(7px);
-    animation: waveMove 7s ease-in-out infinite alternate;
-}
 
-.top-wave::after {
-    top: 30px;
-    background:
-        radial-gradient(
-            ellipse at center,
-            rgba(96, 165, 250, 0.18) 0%,
-            rgba(129, 140, 248, 0.10) 40%,
-            transparent 70%
-        );
-    filter: blur(5px);
-    animation: waveMoveReverse 9s ease-in-out infinite alternate;
-}
+/* =========================================================
+   WAVE ANIMATIONS
+   ========================================================= */
 
-@keyframes waveMove {
+@keyframes topWaveOne {
+
     0% {
-        transform: translateX(-4%) scaleY(0.85);
+        transform:
+            translateX(-6%)
+            translateY(0)
+            rotate(-2deg)
+            scaleY(0.85);
     }
 
     50% {
-        transform: translateX(3%) scaleY(1.15);
+        transform:
+            translateX(3%)
+            translateY(-10px)
+            rotate(1deg)
+            scaleY(1.15);
     }
 
     100% {
-        transform: translateX(-1%) scaleY(0.95);
+        transform:
+            translateX(-2%)
+            translateY(3px)
+            rotate(-1deg)
+            scaleY(0.95);
     }
 }
 
-@keyframes waveMoveReverse {
+
+@keyframes topWaveTwo {
+
     0% {
-        transform: translateX(3%) scaleY(1);
+        transform:
+            translateX(5%)
+            translateY(3px)
+            rotate(2deg)
+            scaleY(0.9);
     }
 
     50% {
-        transform: translateX(-4%) scaleY(0.82);
+        transform:
+            translateX(-4%)
+            translateY(-8px)
+            rotate(-1deg)
+            scaleY(1.15);
     }
 
     100% {
-        transform: translateX(2%) scaleY(1.12);
+        transform:
+            translateX(2%)
+            translateY(2px)
+            rotate(1deg)
+            scaleY(0.9);
     }
 }
 
