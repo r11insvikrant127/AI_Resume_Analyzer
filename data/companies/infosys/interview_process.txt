@@ -1,0 +1,51 @@
+INFOSYS
+Interview and Hiring Process
+
+1. General Recruitment
+
+Infosys uses a recruitment and selection process that can vary
+depending on the role.
+
+The process may include:
+
+- Initial screening
+- Technical or functional interviews
+- Discussions related to cultural alignment and shared values
+
+2. Power Programmers Hiring Process
+
+For the Infosys Power Programmers / Strategic Technology Group
+program, the published hiring flow includes:
+
+Stage 1 — Registration
+
+Candidates register through the relevant hiring initiatives,
+campus connections, or referrals.
+
+Stage 2 — Coding Rounds
+
+Candidates undergo coding assessments designed to evaluate technical
+expertise and problem-solving ability.
+
+Stage 3 — Technical Interviews
+
+Candidates participate in live technical coding interviews with
+technologists.
+
+The interviews can cover a wider range of technology areas.
+
+Stage 4 — Final Selection
+
+Candidates selected after the applicable stages may proceed to
+internships, job-level training, or direct deployment on projects,
+depending on the program.
+
+3. Important Note
+
+The Power Programmers process is a specific Infosys hiring program.
+
+It should not be assumed that every Infosys position follows exactly
+the same sequence or number of rounds.
+
+Candidates should refer to the current job posting or hiring program
+for the applicable recruitment process.

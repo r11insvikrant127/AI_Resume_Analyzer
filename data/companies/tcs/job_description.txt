@@ -1,0 +1,76 @@
+TCS — SOFTWARE ENGINEER
+Reference Job Description for AI Resume Analyzer
+
+IMPORTANT:
+This document is a portfolio/demo job description created for testing
+the AI Resume Analyzer Knowledge Base. It is not an official TCS job
+posting.
+
+1. Role
+
+Position: Software Engineer
+Company: Tata Consultancy Services (TCS)
+
+The Software Engineer will contribute to the development, testing,
+debugging, and maintenance of software applications.
+
+2. Responsibilities
+
+- Develop and maintain software applications.
+- Write clean, readable, and maintainable code.
+- Design and implement software components.
+- Develop and consume REST APIs.
+- Work with relational and NoSQL databases.
+- Debug and resolve software issues.
+- Write unit tests and perform application testing.
+- Participate in code reviews.
+- Collaborate with software engineers, analysts, and other teams.
+- Follow software development and version-control practices.
+- Learn and apply new technologies based on project requirements.
+
+3. Required Skills
+
+- Strong programming fundamentals
+- Data Structures and Algorithms
+- Object-Oriented Programming
+- Problem solving
+- Java or Python
+- SQL
+- Database fundamentals
+- REST APIs
+- Git and version control
+- Software development fundamentals
+- Good communication and teamwork
+
+4. Preferred Skills
+
+- JavaScript or TypeScript
+- Spring Boot
+- Cloud computing
+- Docker
+- CI/CD
+- Microservices
+- MongoDB
+- Linux
+- Agile development
+
+5. Education
+
+- Bachelor's degree in Computer Science, Information Technology,
+  Engineering, or a related discipline.
+
+6. Candidate Profile
+
+The candidate should demonstrate:
+
+- Strong programming fundamentals
+- Ability to learn new technologies
+- Analytical and problem-solving ability
+- Good communication skills
+- Ability to work collaboratively
+- Interest in software engineering and technology
+
+7. Important Note
+
+Actual TCS job requirements vary by role, location, business unit,
+experience level, and hiring program.

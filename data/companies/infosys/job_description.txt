@@ -1,0 +1,79 @@
+INFOSYS — SOFTWARE ENGINEER
+Reference Job Description for AI Resume Analyzer
+
+IMPORTANT:
+This document is a portfolio/demo job description created for testing
+the AI Resume Analyzer Knowledge Base. It is not an official Infosys
+job posting.
+
+1. Role
+
+Position: Software Engineer
+Company: Infosys
+
+The Software Engineer will contribute to software development,
+application engineering, testing, debugging, and technology-driven
+solutions.
+
+2. Responsibilities
+
+- Develop and maintain software applications.
+- Write clean and maintainable code.
+- Analyze technical requirements.
+- Design and implement software components.
+- Develop and work with REST APIs.
+- Work with databases and application data.
+- Debug and resolve software issues.
+- Write and execute tests.
+- Participate in code reviews.
+- Collaborate with development and technology teams.
+- Follow software engineering and version-control practices.
+- Learn and apply new technologies.
+
+3. Required Skills
+
+- Strong programming fundamentals
+- Data Structures and Algorithms
+- Object-Oriented Programming
+- Problem solving
+- Java, Python, or another relevant programming language
+- SQL and database fundamentals
+- REST APIs
+- Git
+- Software development fundamentals
+- Communication and teamwork
+
+4. Preferred Skills
+
+- JavaScript or TypeScript
+- Spring Boot
+- Cloud platforms
+- Docker
+- Microservices
+- CI/CD
+- Artificial Intelligence
+- Machine Learning
+- Data Analytics
+- MongoDB
+- Linux
+
+5. Education
+
+- Bachelor's degree in Computer Science, Information Technology,
+  Engineering, or a related discipline.
+
+6. Candidate Profile
+
+The candidate should demonstrate:
+
+- Strong analytical ability
+- Programming fundamentals
+- Problem-solving skills
+- Willingness to learn
+- Ability to work in a team
+- Interest in software engineering and emerging technologies
+
+7. Important Note
+
+Actual Infosys job requirements differ by role, location, business
+unit, experience level, and hiring program.
