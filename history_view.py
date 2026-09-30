@@ -2,6 +2,7 @@
 
 import json
 import streamlit as st
+from zoneinfo import ZoneInfo
 
 from db_operations import (
     list_user_analyses_with_pagination,
@@ -10,7 +11,7 @@ from db_operations import (
     get_analysis_by_id,
 )
 from report_view import render_single_report
-
+IST = ZoneInfo("Asia/Kolkata")
 
 PAGE_SIZE = 10
 
@@ -58,7 +59,7 @@ def render_history(client, model):
         st.subheader(f"Re-opened: {opened.resume_name}")
         st.caption(
             f"Analysis #{opened.id} · "
-            f"{opened.created_at.strftime('%Y-%m-%d %H:%M')}"
+            f"{opened.created_at.replace(tzinfo=ZoneInfo('UTC')).astimezone(IST).strftime('%Y-%m-%d %H:%M')}"
         )
 
         render_single_report(
@@ -193,7 +194,7 @@ def render_history(client, model):
             st.markdown(f"**{row.resume_name}**")
             st.caption(
                 f"#{row.id} · "
-                f"{row.created_at.strftime('%Y-%m-%d %H:%M')}"
+                f"{row.created_at.replace(tzinfo=ZoneInfo('UTC')).astimezone(IST).strftime('%Y-%m-%d %H:%M')}"
             )
 
         with col2:
