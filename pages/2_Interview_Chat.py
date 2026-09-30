@@ -3,11 +3,26 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 import streamlit as st
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 from page_utils import page_setup
 from chat_view import render_chat
 from db_operations import list_user_analyses_with_pagination
 from styles import hero, section
+
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def to_ist(dt):
+    """Convert a stored UTC timestamp to Indian Standard Time."""
+    if dt is None:
+        return ""
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    return dt.astimezone(IST)
 
 client, MODEL = page_setup("Interview Chat", "🎤")
 
@@ -34,7 +49,7 @@ chosen_id = st.selectbox(
     options=list(analysis_map.keys()),
     format_func=lambda i: (
         f"#{i} — {analysis_map[i].resume_name} "
-        f"({analysis_map[i].created_at.strftime('%Y-%m-%d')})"
+        f"({to_ist(analysis_map[i].created_at).strftime('%Y-%m-%d')})"
     ),
 )
 

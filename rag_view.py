@@ -1,11 +1,25 @@
 # rag_view.py
 
 import streamlit as st
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 from rag_ingest import list_companies, ingest_company
 from rag_query import answer_with_rag
 from db_operations import upsert_rag_company, list_rag_companies
 
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def to_ist(dt):
+    """Convert a stored UTC timestamp to Indian Standard Time."""
+    if dt is None:
+        return ""
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    return dt.astimezone(IST)
 
 def render_knowledge_base(client, model):
 
@@ -64,7 +78,7 @@ def render_knowledge_base(client, model):
                     "Company": r.company,
                     "Docs": r.doc_count,
                     "Chunks": r.chunk_count,
-                    "Updated": r.updated_at.strftime("%Y-%m-%d %H:%M"),
+                    "Updated": to_ist(r.updated_at).strftime("%Y-%m-%d %H:%M"),
                 }
                 for r in indexed
             ],

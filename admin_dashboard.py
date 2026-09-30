@@ -1,7 +1,24 @@
 # admin_dashboard.py
 
 import streamlit as st
+from datetime import timezone
+from zoneinfo import ZoneInfo
+
 from db_operations import list_all_users, list_all_analyses
+
+
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def to_ist(dt):
+    """Convert a stored UTC timestamp to Indian Standard Time."""
+    if dt is None:
+        return ""
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    return dt.astimezone(IST)
 
 
 def render_admin_dashboard():
@@ -39,7 +56,7 @@ def render_admin_dashboard():
             "Email": u.email,
             "Name": u.full_name or "—",
             "Admin": "Yes" if u.is_admin else "No",
-            "Joined": u.created_at.strftime("%Y-%m-%d"),
+            "Joined": to_ist(u.created_at).strftime("%Y-%m-%d"),
         }
         for u in users
     ]
@@ -58,7 +75,7 @@ def render_admin_dashboard():
             "ATS": f"{a.ats_score}%",
             "Required": f"{a.required_match_percentage}%",
             "Technical": f"{a.technical_skill_percentage}%",
-            "Date": a.created_at.strftime("%Y-%m-%d %H:%M"),
+            "Date": to_ist(a.created_at).strftime("%Y-%m-%d %H:%M"),
         }
         for a in analyses
     ]
