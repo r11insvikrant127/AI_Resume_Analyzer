@@ -1,5 +1,4 @@
 import copy
-import textwrap
 import streamlit as st
 from datetime import timezone
 from zoneinfo import ZoneInfo
@@ -9,6 +8,10 @@ from db_operations import list_all_users, list_all_analyses
 
 IST = ZoneInfo("Asia/Kolkata")
 
+
+# ============================================================
+# HELPERS
+# ============================================================
 
 def to_ist(dt):
     """Convert a stored UTC timestamp to Indian Standard Time."""
@@ -22,158 +25,68 @@ def to_ist(dt):
 
 
 def _metric_card(title, value, icon):
+    """
+    Render a simple Streamlit metric card.
+    Uses native Streamlit components instead of raw HTML.
+    """
     with st.container(border=True):
-        st.markdown(
-            textwrap.dedent(
-                f"""
-                <div style="
-                    display:flex;
-                    align-items:center;
-                    gap:12px;
-                    margin-bottom:4px;
-                ">
-                    <span style="font-size:24px;">{icon}</span>
-                    <span style="
-                        font-size:13px;
-                        color:#64748b;
-                        font-weight:600;
-                    ">
-                        {title}
-                    </span>
-                </div>
-
-                <div style="
-                    font-size:30px;
-                    font-weight:700;
-                    color:#1e293b;
-                ">
-                    {value}
-                </div>
-                """
-            ),
-            unsafe_allow_html=True,
+        st.markdown(f"### {icon} {title}")
+        st.metric(
+            label="",
+            value=value,
         )
 
 
 def _section_title(icon, title, description=None):
-    description_html = (
-        f"""
-        <div style="
-            margin-top:4px;
-            color:#64748b;
-            font-size:13px;
-        ">
-            {description}
-        </div>
-        """
-        if description
-        else ""
-    )
+    """Render a section heading using native Streamlit Markdown."""
 
-    st.markdown(
-        textwrap.dedent(
-            f"""
-            <div style="
-                margin-top:8px;
-                margin-bottom:14px;
-            ">
-                <div style="
-                    display:flex;
-                    align-items:center;
-                    gap:10px;
-                    font-size:22px;
-                    font-weight:700;
-                    color:#1e293b;
-                ">
-                    <span>{icon}</span>
-                    <span>{title}</span>
-                </div>
+    st.markdown(f"## {icon} {title}")
 
-                {description_html}
-            </div>
-            """
-        ),
-        unsafe_allow_html=True,
-    )
+    if description:
+        st.caption(description)
 
 
 def _render_list(items, empty_message="None"):
+    """Render a list of items cleanly."""
+
     if not items:
         st.caption(empty_message)
         return
 
     for item in items:
-        st.markdown(
-            textwrap.dedent(
-                f"""
-                <div style="
-                    padding:9px 12px;
-                    margin-bottom:7px;
-                    background:#f8fafc;
-                    border:1px solid #e2e8f0;
-                    border-radius:8px;
-                    color:#334155;
-                    font-size:14px;
-                ">
-                    {item}
-                </div>
-                """
-            ),
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"- {item}")
 
+
+# ============================================================
+# ANALYSIS RESULT
+# ============================================================
 
 def _render_analysis_result(row):
+
     result = row.result_json or {}
 
     # --------------------------------------------------------
     # ANALYSIS HEADER
     # --------------------------------------------------------
 
+    st.divider()
+
+    st.subheader("📄 Resume")
+
     st.markdown(
-        textwrap.dedent(
-            f"""
-            <div style="
-                padding:18px 20px;
-                border:1px solid #e2e8f0;
-                border-radius:12px;
-                background:#f8fafc;
-                margin-bottom:18px;
-            ">
-                <div style="
-                    font-size:13px;
-                    color:#64748b;
-                    margin-bottom:5px;
-                ">
-                    RESUME
-                </div>
+        f"### {row.resume_name}"
+    )
 
-                <div style="
-                    font-size:20px;
-                    font-weight:700;
-                    color:#1e293b;
-                ">
-                    {row.resume_name}
-                </div>
-
-                <div style="
-                    font-size:13px;
-                    color:#64748b;
-                    margin-top:5px;
-                ">
-                    Analysis ID: {row.id}
-                    &nbsp; · &nbsp;
-                    User ID: {row.user_id}
-                </div>
-            </div>
-            """
-        ),
-        unsafe_allow_html=True,
+    st.caption(
+        f"Analysis ID: {row.id}  •  "
+        f"User ID: {row.user_id}"
     )
 
     # --------------------------------------------------------
     # SCORE CARDS
     # --------------------------------------------------------
+
+    st.markdown("### 📊 Analysis Scores")
 
     score_col1, score_col2, score_col3, score_col4 = st.columns(4)
 
@@ -205,8 +118,6 @@ def _render_analysis_result(row):
             "⭐",
         )
 
-    st.write("")
-
     # --------------------------------------------------------
     # CANDIDATE SUMMARY
     # --------------------------------------------------------
@@ -214,6 +125,7 @@ def _render_analysis_result(row):
     summary = result.get("candidate_summary")
 
     if summary:
+
         _section_title(
             "👤",
             "Candidate Summary",
@@ -226,9 +138,17 @@ def _render_analysis_result(row):
     # MATCH ANALYSIS
     # --------------------------------------------------------
 
-    experience_match = result.get("experience_match")
-    education_match = result.get("education_match")
-    project_match = result.get("project_match")
+    experience_match = result.get(
+        "experience_match"
+    )
+
+    education_match = result.get(
+        "education_match"
+    )
+
+    project_match = result.get(
+        "project_match"
+    )
 
     if any(
         [
@@ -248,28 +168,50 @@ def _render_analysis_result(row):
         with match_col1:
 
             if experience_match:
+
                 with st.container(border=True):
-                    st.markdown("**Experience Match**")
-                    st.write(experience_match)
+                    st.markdown(
+                        "**Experience Match**"
+                    )
+                    st.write(
+                        experience_match
+                    )
 
             if education_match:
+
                 with st.container(border=True):
-                    st.markdown("**Education Match**")
-                    st.write(education_match)
+                    st.markdown(
+                        "**Education Match**"
+                    )
+                    st.write(
+                        education_match
+                    )
 
         with match_col2:
 
             if project_match:
+
                 with st.container(border=True):
-                    st.markdown("**Project Match**")
-                    st.write(project_match)
+                    st.markdown(
+                        "**Project Match**"
+                    )
+                    st.write(
+                        project_match
+                    )
 
     # --------------------------------------------------------
     # STRENGTHS / WEAKNESSES
     # --------------------------------------------------------
 
-    strengths = result.get("strengths", [])
-    weaknesses = result.get("weaknesses", [])
+    strengths = result.get(
+        "strengths",
+        []
+    )
+
+    weaknesses = result.get(
+        "weaknesses",
+        []
+    )
 
     if strengths or weaknesses:
 
@@ -281,20 +223,37 @@ def _render_analysis_result(row):
         strength_col, weakness_col = st.columns(2)
 
         with strength_col:
+
             with st.container(border=True):
-                st.markdown("### ✅ Strengths")
-                _render_list(strengths)
+
+                st.markdown(
+                    "### ✅ Strengths"
+                )
+
+                _render_list(
+                    strengths
+                )
 
         with weakness_col:
+
             with st.container(border=True):
-                st.markdown("### ⚠️ Weaknesses")
-                _render_list(weaknesses)
+
+                st.markdown(
+                    "### ⚠️ Weaknesses"
+                )
+
+                _render_list(
+                    weaknesses
+                )
 
     # --------------------------------------------------------
     # SKILL GAP
     # --------------------------------------------------------
 
-    skill_gap = result.get("skill_gap", {})
+    skill_gap = result.get(
+        "skill_gap",
+        {}
+    )
 
     if skill_gap:
 
@@ -306,45 +265,60 @@ def _render_analysis_result(row):
         gap_col1, gap_col2, gap_col3 = st.columns(3)
 
         with gap_col1:
+
             with st.container(border=True):
-                st.markdown("**Matched Required**")
+
+                st.markdown(
+                    "**Matched Required**"
+                )
 
                 _render_list(
                     skill_gap.get(
                         "matched_required",
-                        [],
+                        []
                     ),
                     "No matched required skills.",
                 )
 
         with gap_col2:
+
             with st.container(border=True):
-                st.markdown("**High Priority Gaps**")
+
+                st.markdown(
+                    "**High Priority Gaps**"
+                )
 
                 _render_list(
                     skill_gap.get(
                         "high_priority_gaps",
-                        [],
+                        []
                     ),
                     "No high-priority gaps.",
                 )
 
         with gap_col3:
+
             with st.container(border=True):
-                st.markdown("**Good-to-have Gaps**")
+
+                st.markdown(
+                    "**Good-to-have Gaps**"
+                )
 
                 _render_list(
                     skill_gap.get(
                         "good_to_have_gaps",
-                        [],
+                        []
                     ),
                     "No good-to-have gaps.",
                 )
 
-        severity = skill_gap.get("overall_severity")
+        severity = skill_gap.get(
+            "overall_severity"
+        )
 
         if severity:
-            st.caption(
+
+            st.info(
                 f"Overall skill-gap severity: "
                 f"**{severity.title()}**"
             )
@@ -355,7 +329,7 @@ def _render_analysis_result(row):
 
     improvements = result.get(
         "resume_improvements",
-        [],
+        []
     )
 
     if improvements:
@@ -366,7 +340,10 @@ def _render_analysis_result(row):
         )
 
         with st.container(border=True):
-            _render_list(improvements)
+
+            _render_list(
+                improvements
+            )
 
     # --------------------------------------------------------
     # INTERVIEW QUESTIONS
@@ -374,7 +351,7 @@ def _render_analysis_result(row):
 
     interview_questions = result.get(
         "interview_questions",
-        [],
+        []
     )
 
     if interview_questions:
@@ -390,27 +367,28 @@ def _render_analysis_result(row):
                 interview_questions,
                 start=1,
             ):
+
                 st.markdown(
                     f"**{index}.** {question}"
                 )
 
     # --------------------------------------------------------
-    # SKILLS
+    # SKILL MATCHING
     # --------------------------------------------------------
 
     required_skills = result.get(
         "required_skills",
-        [],
+        []
     )
 
     matched_skills = result.get(
         "matched_skills",
-        [],
+        []
     )
 
     missing_skills = result.get(
         "missing_skills",
-        [],
+        []
     )
 
     if (
@@ -429,7 +407,10 @@ def _render_analysis_result(row):
         with skill_col1:
 
             with st.container(border=True):
-                st.markdown("**Matched Skills**")
+
+                st.markdown(
+                    "**Matched Skills**"
+                )
 
                 _render_list(
                     matched_skills,
@@ -439,7 +420,10 @@ def _render_analysis_result(row):
         with skill_col2:
 
             with st.container(border=True):
-                st.markdown("**Missing Skills**")
+
+                st.markdown(
+                    "**Missing Skills**"
+                )
 
                 _render_list(
                     missing_skills,
@@ -447,12 +431,12 @@ def _render_analysis_result(row):
                 )
 
     # --------------------------------------------------------
-    # KEYWORD ANALYSIS
+    # ATS KEYWORD ANALYSIS
     # --------------------------------------------------------
 
     keyword_analysis = result.get(
         "ats_keyword_analysis",
-        {},
+        {}
     )
 
     if keyword_analysis:
@@ -464,7 +448,7 @@ def _render_analysis_result(row):
 
         keyword_rows = keyword_analysis.get(
             "keyword_rows",
-            [],
+            []
         )
 
         if keyword_rows:
@@ -472,19 +456,20 @@ def _render_analysis_result(row):
             rows = []
 
             for item in keyword_rows:
+
                 rows.append(
                     {
                         "Keyword": item.get(
                             "keyword",
-                            "",
+                            ""
                         ),
                         "Tier": item.get(
                             "tier",
-                            "",
+                            ""
                         ),
                         "Count": item.get(
                             "count",
-                            0,
+                            0
                         ),
                         "In Skills Section": (
                             "Yes"
@@ -496,10 +481,20 @@ def _render_analysis_result(row):
                     }
                 )
 
-            st.dataframe(
-                rows,
-                use_container_width=True,
-                hide_index=True,
+            with st.container(
+                border=True
+            ):
+
+                st.dataframe(
+                    rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+        else:
+
+            st.caption(
+                "No ATS keyword details available."
             )
 
     # --------------------------------------------------------
@@ -510,21 +505,23 @@ def _render_analysis_result(row):
         "🔧 View full stored analysis JSON"
     ):
 
-        # Do not dump the entire resume text
-        # into the main JSON viewer.
         display_result = copy.deepcopy(
             result
         )
 
+        # Avoid displaying the entire resume
+        # text inside the JSON viewer.
         display_result.pop(
             "resume_text",
-            None,
+            None
         )
 
-        st.json(display_result)
+        st.json(
+            display_result
+        )
 
     # --------------------------------------------------------
-    # RAW RESUME TEXT
+    # EXTRACTED RESUME TEXT
     # --------------------------------------------------------
 
     resume_text = result.get(
@@ -536,22 +533,42 @@ def _render_analysis_result(row):
         with st.expander(
             "📄 View extracted resume text"
         ):
-            st.text(resume_text)
 
+            st.text(
+                resume_text
+            )
+
+
+# ============================================================
+# ADMIN DASHBOARD
+# ============================================================
 
 def render_admin_dashboard():
+
+    # --------------------------------------------------------
+    # ADMIN ACCESS
+    # --------------------------------------------------------
 
     if not st.session_state.get(
         "is_admin"
     ):
-        st.error("Admin access only.")
+
+        st.error(
+            "Admin access only."
+        )
+
         return
 
+    # --------------------------------------------------------
+    # LOAD DATA
+    # --------------------------------------------------------
+
     users = list_all_users()
+
     analyses = list_all_analyses()
 
     # ========================================================
-    # OVERVIEW
+    # PLATFORM OVERVIEW
     # ========================================================
 
     _section_title(
@@ -576,6 +593,7 @@ def render_admin_dashboard():
     c1, c2, c3 = st.columns(3)
 
     with c1:
+
         _metric_card(
             "Total Users",
             len(users),
@@ -583,6 +601,7 @@ def render_admin_dashboard():
         )
 
     with c2:
+
         _metric_card(
             "Total Analyses",
             len(analyses),
@@ -590,13 +609,12 @@ def render_admin_dashboard():
         )
 
     with c3:
+
         _metric_card(
             "Average ATS Score",
             f"{avg_ats}%",
             "🎯",
         )
-
-    st.write("")
 
     # ========================================================
     # USERS
@@ -614,7 +632,11 @@ def render_admin_dashboard():
             {
                 "ID": u.id,
                 "Email": u.email,
-                "Name": u.full_name or "—",
+                "Name": (
+                    u.full_name
+                    if u.full_name
+                    else "—"
+                ),
                 "Admin": (
                     "Yes"
                     if u.is_admin
@@ -632,6 +654,7 @@ def render_admin_dashboard():
         with st.container(
             border=True
         ):
+
             st.dataframe(
                 user_rows,
                 use_container_width=True,
@@ -643,11 +666,10 @@ def render_admin_dashboard():
         with st.container(
             border=True
         ):
+
             st.info(
                 "No registered users yet."
             )
-
-    st.write("")
 
     # ========================================================
     # RECENT ANALYSES
@@ -666,7 +688,9 @@ def render_admin_dashboard():
                 "ID": a.id,
                 "User": a.user_id,
                 "Resume": a.resume_name,
-                "ATS": f"{a.ats_score}%",
+                "ATS": (
+                    f"{a.ats_score}%"
+                ),
                 "Required": (
                     f"{a.required_match_percentage}%"
                 ),
@@ -685,6 +709,7 @@ def render_admin_dashboard():
         with st.container(
             border=True
         ):
+
             st.dataframe(
                 analysis_rows,
                 use_container_width=True,
@@ -696,15 +721,14 @@ def render_admin_dashboard():
         with st.container(
             border=True
         ):
+
             st.info(
                 "No resume analyses have "
                 "been recorded yet."
             )
 
-    st.write("")
-
     # ========================================================
-    # VIEW RESULT
+    # VIEW ANALYSIS RESULT
     # ========================================================
 
     _section_title(
@@ -744,6 +768,7 @@ def render_admin_dashboard():
         with st.container(
             border=True
         ):
+
             st.info(
                 "Run a resume analysis first "
                 "to view its result here."
