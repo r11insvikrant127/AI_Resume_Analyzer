@@ -1491,6 +1491,85 @@ h1, h2, h3 {
     margin-top: 40px;
 }
 
+/* =========================================================
+   ANIMATED TOP WAVES
+   ========================================================= */
+
+.top-wave {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 68px;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.top-wave::before,
+.top-wave::after {
+    content: "";
+    position: absolute;
+    left: -10%;
+    width: 120%;
+    height: 55px;
+    border-radius: 50%;
+    opacity: 0.55;
+}
+
+.top-wave::before {
+    top: 18px;
+    background:
+        radial-gradient(
+            ellipse at center,
+            rgba(37, 99, 235, 0.16) 0%,
+            rgba(79, 70, 229, 0.10) 45%,
+            transparent 72%
+        );
+    filter: blur(7px);
+    animation: waveMove 7s ease-in-out infinite alternate;
+}
+
+.top-wave::after {
+    top: 30px;
+    background:
+        radial-gradient(
+            ellipse at center,
+            rgba(96, 165, 250, 0.18) 0%,
+            rgba(129, 140, 248, 0.10) 40%,
+            transparent 70%
+        );
+    filter: blur(5px);
+    animation: waveMoveReverse 9s ease-in-out infinite alternate;
+}
+
+@keyframes waveMove {
+    0% {
+        transform: translateX(-4%) scaleY(0.85);
+    }
+
+    50% {
+        transform: translateX(3%) scaleY(1.15);
+    }
+
+    100% {
+        transform: translateX(-1%) scaleY(0.95);
+    }
+}
+
+@keyframes waveMoveReverse {
+    0% {
+        transform: translateX(3%) scaleY(1);
+    }
+
+    50% {
+        transform: translateX(-4%) scaleY(0.82);
+    }
+
+    100% {
+        transform: translateX(2%) scaleY(1.12);
+    }
+}
 
 /* =========================================================
    HIDE STREAMLIT CHROME
@@ -1597,6 +1676,10 @@ def inject_theme():
     """Inject the complete application theme on every rerun."""
     st.markdown(THEME_CSS, unsafe_allow_html=True)
 
+    st.markdown(
+        '<div class="top-wave"></div>',
+        unsafe_allow_html=True
+    )
 
 # ============================================================
 # LOADING BAR
