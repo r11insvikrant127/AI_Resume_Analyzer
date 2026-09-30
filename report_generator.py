@@ -2,6 +2,7 @@
 
 import io
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -15,7 +16,7 @@ from reportlab.platypus import (
     TableStyle,
     PageBreak,
 )
-
+IST = ZoneInfo("Asia/Kolkata")
 
 # ============================================================
 # STYLESHEET (cached, with guarded registration)
@@ -171,7 +172,7 @@ def build_pdf_report(result):
     flow.append(Paragraph("AI Resume Analysis Report", s["Title"]))
     flow.append(Paragraph(f"Resume: <b>{resume_name}</b>", s["Body"]))
     flow.append(Paragraph(
-        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"Generated: {datetime.now(IST).strftime('%Y-%m-%d %H:%M')}",
         s["Body"],
     ))
     flow.append(Spacer(1, 12))
@@ -339,7 +340,7 @@ def build_comparison_pdf(results):
 
     flow.append(Paragraph("Resume Comparison Report", s["Title"]))
     flow.append(Paragraph(
-        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"Generated: {datetime.now(IST).strftime('%Y-%m-%d %H:%M')}",
         s["Body"],
     ))
     flow.append(Spacer(1, 12))
