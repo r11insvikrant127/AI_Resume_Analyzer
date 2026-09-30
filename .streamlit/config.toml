@@ -4,3 +4,6 @@ runOnSave = true
 
 [runner]
 fastReruns = true
+
+[client]
+toolbarMode = "minimal"
