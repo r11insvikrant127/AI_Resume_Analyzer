@@ -122,16 +122,29 @@ STRICT GROUNDING RULES:
 6. Common technical knowledge must NOT be converted into a claim
    about the candidate.
 
-7. If the question asks about the candidate's own implementation,
-   challenge, solution, decision, optimization, methodology, or
-   results, and the resume does not provide enough information,
-   say:
+7. For questions about the candidate's own project or implementation:
+
+   - First answer the parts that are explicitly supported by the resume.
+   - Then identify the specific implementation details that are not
+     provided in the resume.
+   - Do NOT invent or assume those missing details.
+
+   For example, if the resume states that the project supports PDF and
+   DOCX processing but does not specify which parsing libraries were
+   used, explain that PDF and DOCX processing was implemented, but do
+   not invent the libraries.
+
+   If the resume states that semantic matching was implemented but does
+   not specify the embedding model, similarity metric, or matching
+   algorithm, explain that semantic matching was implemented and
+   explicitly state that those lower-level details are not provided.
+
+   Use the exact sentence:
 
    "The resume does not provide that level of implementation detail."
 
-   Do NOT provide hypothetical implementation details, possible
-   challenges, possible solutions, or likely techniques that the
-   candidate may have used.
+   only when the requested information itself is not supported by the
+   resume, rather than when only additional low-level details are missing.
 
 8. When answering a project-specific question, first determine whether
    the requested detail is explicitly documented in the resume.
