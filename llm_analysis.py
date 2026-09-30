@@ -2,7 +2,9 @@
 
 import json
 import re
+
 from groq_helper import safe_chat
+
 
 def parse_json_response(content):
     """
@@ -14,7 +16,12 @@ def parse_json_response(content):
 
     content = content.strip()
 
-    content = re.sub(r"^```json\s*", "", content, flags=re.IGNORECASE)
+    content = re.sub(
+        r"^```json\s*",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    )
     content = re.sub(r"^```\s*", "", content)
     content = re.sub(r"\s*```$", "", content)
 
@@ -45,6 +52,10 @@ def analyze_resume(client, model, resume_text, job_description):
     Use the LLM for qualitative resume analysis.
 
     Numerical ATS scoring is NOT performed here.
+
+    Interview questions are generated dynamically from the
+    supplied resume and job description. No resume-specific
+    questions are hardcoded.
     """
 
     prompt = f"""
@@ -71,22 +82,67 @@ Rules:
 
 1. Do not invent candidate experience.
 
-2. Do not assume a skill that is not supported by
-   the resume.
+2. Do not assume a skill that is not explicitly supported
+   by the resume.
 
-3. Base the analysis only on the provided resume
-   and job description.
+3. Base candidate-specific claims only on information
+   explicitly present in the provided resume.
 
-4. interview_questions should contain 10 relevant
+4. The job description describes the target role and its
+   requirements. Do NOT treat technologies, responsibilities,
+   qualifications, or skills mentioned only in the job
+   description as evidence that the candidate possesses them.
+
+5. interview_questions must contain exactly 10 relevant
    questions.
 
-5. Keep the answer concise but useful.
+6. Generate the interview questions dynamically from the
+   candidate's actual resume and the job description.
 
-6. Do not calculate or invent an ATS score.
+7. Questions should preferably explore information explicitly
+   present in the candidate's:
+   - projects
+   - work experience
+   - technical skills
+   - education
+   - achievements
+   - responsibilities
 
-7. Do not fabricate achievements or metrics.
+8. Do not use a fixed or reusable question list. The questions
+   should change according to the contents of each resume.
 
-8. Return JSON only.
+9. Do not create a question that assumes the candidate used
+   a specific algorithm, data structure, feature type, dataset,
+   model architecture, library, framework, metric, equation,
+   training procedure, deployment method, or implementation
+   technique unless that information is explicitly supported
+   by the resume.
+
+10. If a technology or algorithm is mentioned in the resume,
+    you may ask about that technology or algorithm. However,
+    do not assume that the candidate used additional techniques
+    commonly associated with it.
+
+11. If a project is mentioned but the resume does not provide
+    implementation details, ask questions that allow the
+    candidate to explain those details rather than assuming
+    what those details were.
+
+12. General technical knowledge may be tested when it is
+    relevant to a technology explicitly mentioned in the
+    resume, but the question must not imply that the candidate
+    used an unstated technique.
+
+13. Do not invent project details, responsibilities,
+    achievements, technologies, metrics, or results.
+
+14. Keep the analysis concise but useful.
+
+15. Do not calculate or invent an ATS score.
+
+16. Do not fabricate achievements or metrics.
+
+17. Return JSON only.
 
 RESUME:
 
@@ -105,16 +161,22 @@ JOB DESCRIPTION:
                 "role": "system",
                 "content": (
                     "You are a professional resume analyst. "
+                    "Ground candidate-specific claims strictly "
+                    "in the supplied resume. "
+                    "Generate interview questions dynamically "
+                    "from the supplied resume and job description. "
+                    "Never invent candidate experience. "
                     "Return valid JSON only."
-                )
+                ),
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ],
         temperature=0.2,
         max_tokens=1500,
     )
 
     content = response.choices[0].message.content or ""
+
     return parse_json_response(content)
 
 
@@ -174,9 +236,9 @@ Return only a numbered list.
                     "You are an expert resume coach. "
                     "Never invent or fabricate candidate "
                     "achievements or metrics."
-                )
+                ),
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ],
         temperature=0.3,
         max_tokens=1500,
